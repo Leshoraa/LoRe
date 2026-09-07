@@ -1,0 +1,40 @@
+# ==============================================================================
+# LoRe - ESP32-S3 Firmware .gitignore
+# ==============================================================================
+
+# --- Secrets & Environment Configurations ---
+include/env.h
+env.h
+*.env
+!include/env.example.h
+
+# --- Build Artifacts & Binaries ---
+build/
+*.bin
+*.elf
+*.hex
+*.map
+*.o
+*.a
+*.d
+
+# --- Arduino CLI & Toolchain Caches ---
+.arduino15/
+compile_commands.json
+.cache/
+
+# --- Host Unit Test Binaries & Temporary Outputs ---
+/tmp/lore_tests_bin/
+/test_*
+!tests/**
+*.log
+
+# --- IDEs & System Files ---
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+*.bak
