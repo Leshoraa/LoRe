@@ -155,7 +155,7 @@ void initWeatherClient(void) {
         xTaskCreatePinnedToCore(
             weatherTask,
             "Weather_Task",
-            3072,
+            5120,
             NULL,
             1,
             &s_weather_task_handle,

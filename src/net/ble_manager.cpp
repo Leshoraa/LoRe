@@ -35,11 +35,14 @@ static volatile bool s_ble_telemetry_streaming = false;
 static volatile uint32_t s_ble_telemetry_interval_ms = 500;
 static TaskHandle_t s_ble_telemetry_task_handle = NULL;
 
-static portMUX_TYPE s_ble_telem_mux = portMUX_INITIALIZER_UNLOCKED;
+static SemaphoreHandle_t s_ble_tx_mutex = NULL;
 static char s_ble_telemetry_buf[1400];
 
 static void sendBleData(const char* data, size_t len) {
     if (!s_pTxCharacteristic || !s_device_connected || len == 0) return;
+    if (s_ble_tx_mutex && xSemaphoreTakeRecursive(s_ble_tx_mutex, pdMS_TO_TICKS(150)) != pdTRUE) {
+        return;
+    }
 
     const size_t CHUNK_SIZE = 120;
     size_t offset = 0;
@@ -53,14 +56,24 @@ static void sendBleData(const char* data, size_t len) {
             vTaskDelay(pdMS_TO_TICKS(30));
         }
     }
+
+    if (s_ble_tx_mutex) {
+        xSemaphoreGiveRecursive(s_ble_tx_mutex);
+    }
 }
 
 void sendBleTelemetryNow(void) {
     if (!s_pTxCharacteristic || !s_device_connected) return;
-    portENTER_CRITICAL(&s_ble_telem_mux);
+    if (s_ble_tx_mutex && xSemaphoreTakeRecursive(s_ble_tx_mutex, pdMS_TO_TICKS(150)) != pdTRUE) {
+        return;
+    }
+
     formatTelemetryJson(s_ble_telemetry_buf, sizeof(s_ble_telemetry_buf));
-    portEXIT_CRITICAL(&s_ble_telem_mux);
     sendBleData(s_ble_telemetry_buf, strlen(s_ble_telemetry_buf));
+
+    if (s_ble_tx_mutex) {
+        xSemaphoreGiveRecursive(s_ble_tx_mutex);
+    }
 }
 
 void setBleTelemetryStreaming(bool enable, uint32_t interval_ms) {
@@ -738,6 +751,10 @@ void initBleNotificationServer(void) {
 
     esp_bt_controller_mem_release(ESP_BT_MODE_CLASSIC_BT);
 
+    if (!s_ble_tx_mutex) {
+        s_ble_tx_mutex = xSemaphoreCreateRecursiveMutex();
+    }
+
     if (!s_ble_rx_queue) {
         s_ble_rx_queue = xQueueCreate(16, sizeof(char*));
     }
@@ -745,7 +762,7 @@ void initBleNotificationServer(void) {
         xTaskCreatePinnedToCore(
             bleRxTask,
             "BLE_Rx_Task",
-            3584,
+            6144,
             NULL,
             2,
             &s_ble_rx_task_handle,
@@ -792,7 +809,7 @@ void initBleNotificationServer(void) {
         xTaskCreatePinnedToCore(
             bleTelemetryStreamTask,
             "BLE_Telem_Task",
-            3072,
+            8192,
             NULL,
             1,
             &s_ble_telemetry_task_handle,

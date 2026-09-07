@@ -58,12 +58,48 @@ void showBootStatus(const char* line1, const char* line2) {
     }
 }
 
+static uint8_t calculateTargetAutoBrightness(void) {
+    time_t now_sec;
+    time(&now_sec);
+    struct tm timeinfo;
+    bool time_synced = (now_sec > 1700000000);
+    bool is_night_time = false;
+    if (time_synced) {
+        localtime_r(&now_sec, &timeinfo);
+        is_night_time = (timeinfo.tm_hour >= NIGHT_HOUR_START || timeinfo.tm_hour < NIGHT_HOUR_END);
+    }
+
+    float ambient_lum = getAmbientLuminance();
+    float target_bright = 5.0f;
+    if (ambient_lum <= 25.0f) {
+        target_bright = 5.0f + (ambient_lum / 25.0f) * 30.0f;
+    } else if (ambient_lum <= 100.0f) {
+        target_bright = 35.0f + ((ambient_lum - 25.0f) / 75.0f) * 120.0f;
+    } else {
+        target_bright = 155.0f + ((ambient_lum - 100.0f) / 155.0f) * 100.0f;
+    }
+
+    if (is_night_time) {
+        target_bright = fminf(target_bright * 0.50f, 65.0f);
+    }
+
+    return (uint8_t)fmaxf(3.0f, fminf(255.0f, target_bright));
+}
+
 void setOledBrightnessLive(uint8_t brightness) {
     g_oled_brightness = brightness;
+    s_last_applied_brightness = brightness;
+    lcd.setBrightness(brightness);
 }
 
 void setAutoBrightnessLive(bool enabled) {
     g_auto_brightness_enabled = enabled;
+    if (enabled) {
+        uint8_t target = calculateTargetAutoBrightness();
+        g_oled_brightness = target;
+        s_last_applied_brightness = target;
+        lcd.setBrightness(target);
+    }
 }
 
 void triggerAmbientDisplay(AmbientScreenMode mode, uint32_t duration_ms) {
@@ -127,32 +163,7 @@ void oledTask(void* pvParameters) {
         if (g_auto_brightness_enabled) {
             if (now - s_last_auto_bright_check_ms > 250) {
                 s_last_auto_bright_check_ms = now;
-
-                time_t now_sec;
-                time(&now_sec);
-                struct tm timeinfo;
-                bool time_synced = (now_sec > 1700000000);
-                bool is_night_time = false;
-                if (time_synced) {
-                    localtime_r(&now_sec, &timeinfo);
-                    is_night_time = (timeinfo.tm_hour >= NIGHT_HOUR_START || timeinfo.tm_hour < NIGHT_HOUR_END);
-                }
-
-                float ambient_lum = getAmbientLuminance();
-                float target_bright = 5.0f;
-                if (ambient_lum <= 25.0f) {
-                    target_bright = 5.0f + (ambient_lum / 25.0f) * 30.0f;
-                } else if (ambient_lum <= 100.0f) {
-                    target_bright = 35.0f + ((ambient_lum - 25.0f) / 75.0f) * 120.0f;
-                } else {
-                    target_bright = 155.0f + ((ambient_lum - 100.0f) / 155.0f) * 100.0f;
-                }
-
-                if (is_night_time) {
-                    target_bright = fminf(target_bright * 0.50f, 65.0f);
-                }
-
-                uint8_t target_clamped = (uint8_t)fmaxf(3.0f, fminf(255.0f, target_bright));
+                uint8_t target_clamped = calculateTargetAutoBrightness();
 
                 if (abs((int)g_oled_brightness - (int)target_clamped) > 1) {
                     g_oled_brightness = (uint8_t)(0.72f * g_oled_brightness + 0.28f * target_clamped);

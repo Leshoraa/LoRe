@@ -3,10 +3,10 @@
  * @brief Production Web UI dashboard and telemetry control interface for LoRe.
  * @details Balanced Modern Bento Grid Design System:
  *          - Integrated Top Segmented Tab Control aligned with dashboard grid.
- *          - Balanced desktop height between camera feed and right telemetry/expression column.
+ *          - Interactive 2D Gaze Steering Pad with real-time stimulus tracking.
  *          - Pure geometric typography with rounded numerals (robust offline system fallback).
- *          - Proportional 3-column metric tiles on both mobile and desktop screens.
- *          - Minimalist Apple Camera-style focus tracker on HTML5 HUD canvas.
+ *          - Proportional multi-column metric tiles on both mobile and desktop screens.
+ *          - Cyber radar HUD canvas with real-time target trajectory and coordinate feedback.
  */
 
 #ifndef WEB_UI_H
@@ -275,61 +275,80 @@ static const char HTML_PAGE[] PROGMEM = R"rawliteral(<!DOCTYPE html>
       border-radius: 5px;
     }
 
-    /* Camera Stream Card */
-    .stream-viewport {
+    /* Gaze Steering Pad & Radar Viewport - Monochrome B&W System */
+    .gaze-viewport {
       position: relative;
       width: 100%;
       aspect-ratio: 4 / 3;
-      background-color: #090d16;
+      background-color: var(--bg-surface);
+      border: 1px solid var(--border-card);
       border-radius: var(--radius-sub);
+      box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.03);
       overflow: hidden;
       display: flex;
       justify-content: center;
       align-items: center;
-      border: none;
+      cursor: crosshair;
+      user-select: none;
+      touch-action: none;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
     }
 
-    .skeleton-loader {
+    .gaze-viewport:hover {
+      border-color: var(--md-sys-color-outline);
+    }
+
+    .gaze-viewport:active {
+      box-shadow: inset 0 2px 7px rgba(0, 0, 0, 0.07);
+    }
+
+    #gaze-canvas {
       position: absolute;
       top: 0;
       left: 0;
       width: 100%;
       height: 100%;
-      background: #0d121f;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      color: #64748b;
-      font-size: 11px;
-      font-weight: 600;
-      letter-spacing: 0.04em;
-      gap: 10px;
-    }
-
-    .skeleton-loader .skeleton-grid {
-      width: 40px;
-      height: 30px;
-      border: 1.5px dashed #334155;
-      border-radius: 6px;
-    }
-
-    .stream-viewport img {
-      width: 100%;
-      height: 100%;
-      object-fit: contain;
       display: block;
       z-index: 2;
     }
 
-    #hud-canvas {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      pointer-events: none;
-      z-index: 3;
+    .gaze-hint {
+      margin-top: 8px;
+      font-size: 11px;
+      color: var(--text-muted);
+      text-align: center;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      letter-spacing: -0.01em;
+    }
+
+    .btn-reset-gaze {
+      font-family: inherit;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-main);
+      background-color: var(--bg-surface);
+      border: 1px solid var(--border-card);
+      padding: 3px 9px;
+      border-radius: 6px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease, transform 0.15s ease;
+    }
+
+    .btn-reset-gaze:hover {
+      background-color: var(--accent-dark);
+      color: #ffffff;
+      border-color: var(--accent-dark);
+    }
+
+    .btn-reset-gaze:active {
+      transform: scale(0.96);
     }
 
     /* Telemetry Metrics Grid - Strokeless Inner Cards */
@@ -650,7 +669,7 @@ static const char HTML_PAGE[] PROGMEM = R"rawliteral(<!DOCTYPE html>
       transform: none;
     }
 
-    .btn-cam-param, .btn-cam-toggle {
+    .btn-param, .btn-toggle {
       flex: 1;
       padding: 8px 4px;
       font-family: inherit;
@@ -665,11 +684,11 @@ static const char HTML_PAGE[] PROGMEM = R"rawliteral(<!DOCTYPE html>
       transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
     }
 
-    .btn-cam-param:hover, .btn-cam-toggle:hover {
+    .btn-param:hover, .btn-toggle:hover {
       background-color: var(--bg-surface-hover);
     }
 
-    .btn-cam-param.active, .btn-cam-toggle.active {
+    .btn-param.active, .btn-toggle.active {
       background-color: var(--accent-dark);
       color: #ffffff;
       border-color: var(--accent-dark);
@@ -791,12 +810,11 @@ static const char HTML_PAGE[] PROGMEM = R"rawliteral(<!DOCTYPE html>
         width: 100%;
         padding: 14px;
       }
-      #card-camera { order: 1; }
+      #card-gaze { order: 1; }
       #card-telemetry { order: 2; }
       #card-expression { order: 3; }
-      #card-brightness { order: 4; }
-      #card-imagetuning { order: 5; }
-      #card-orientation { order: 6; }
+      #card-display-ambient { order: 4; }
+      #card-cognition { order: 5; }
 
       .metrics-grid {
         grid-template-columns: repeat(2, 1fr);
@@ -816,7 +834,7 @@ static const char HTML_PAGE[] PROGMEM = R"rawliteral(<!DOCTYPE html>
         padding: 8px 2px;
         font-size: 10px;
       }
-      .btn-cam-param, .btn-cam-toggle {
+      .btn-param, .btn-toggle {
         flex: 1;
         min-width: 0;
         padding: 8px 2px;
@@ -841,13 +859,13 @@ static const char HTML_PAGE[] PROGMEM = R"rawliteral(<!DOCTYPE html>
     <!-- Top Navigation Controls -->
     <div class="top-controls">
       <div class="tab-segmented-control">
-        <button type="button" class="tab-btn active" data-target="tab-vision">
+        <button type="button" class="tab-btn active" data-target="tab-control">
           <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"></path>
-            <circle cx="12" cy="13" r="3"></circle>
+            <circle cx="12" cy="12" r="10"></circle>
+            <circle cx="12" cy="12" r="3"></circle>
           </svg>
-          <span class="tab-label-full">Vision & Rig</span>
-          <span class="tab-label-short">Vision</span>
+          <span class="tab-label-full">Control & Rig</span>
+          <span class="tab-label-short">Control</span>
         </button>
         <button type="button" class="tab-btn" data-target="tab-network">
           <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -870,60 +888,61 @@ static const char HTML_PAGE[] PROGMEM = R"rawliteral(<!DOCTYPE html>
       <div id="mode-badge" class="mode-pill">STA Online</div>
     </div>
 
-    <!-- Tab 1: Vision & Telemetry Bento Grid -->
-    <div id="tab-vision" class="tab-pane active">
+    <!-- Tab 1: Control & Telemetry Bento Grid -->
+    <div id="tab-control" class="tab-pane active">
       <div class="bento-grid">
         
-        <!-- Left Bento Column: Camera Feed & Image Tuning -->
+        <!-- Left Bento Column: Gaze Steering & Display Ambience -->
         <div class="bento-col">
           
-          <!-- Bento Card 1: Camera Viewport & Capture -->
-          <section class="bento-card" id="card-camera">
+          <!-- Bento Card 1: Gaze Steering Pad -->
+          <section class="bento-card" id="card-gaze">
             <div class="bento-card-header">
-              <h2 class="card-title">Camera</h2>
-            </div>
-            <div class="stream-viewport">
-              <div id="stream-skeleton" class="skeleton-loader">
-                <div class="skeleton-grid"></div>
-                <span>CONNECTING SENSOR FEED...</span>
+              <h2 class="card-title">Gaze Steering Pad</h2>
+              <div style="display:flex;align-items:center;gap:6px;">
+                <span class="card-badge" id="gaze-coords" style="font-family:monospace;font-variant-numeric:tabular-nums;font-weight:700;">X: 0.00 | Y: 0.00</span>
+                <button type="button" id="btn-center-gaze" class="btn-reset-gaze" title="Reset Gaze to Center">⌖ Center</button>
               </div>
-              <img id="stream-img" src="" alt="LoRe Camera Feed" crossorigin="anonymous">
-              <canvas id="hud-canvas"></canvas>
             </div>
-
-            <!-- Capture Button (Below Camera Viewport) -->
-            <div style="margin-top:10px;">
-              <button type="button" id="btn-capture-frame" class="btn-cam-param" style="width:100%;padding:8px 12px;font-size:12px;font-weight:600;border-radius:var(--radius-control);display:flex;align-items:center;justify-content:center;gap:6px;" title="Capture Raw Frame">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"></path><circle cx="12" cy="13" r="3"></circle></svg>
-                <span id="btn-capture-text">Capture Photo</span>
-              </button>
+            <div class="gaze-viewport" id="gaze-viewport">
+              <canvas id="gaze-canvas"></canvas>
+            </div>
+            <div class="gaze-hint">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v8"/><path d="M8 12h8"/></svg>
+              <span>Click or drag to steer LoRe's attention in real time</span>
             </div>
           </section>
 
-          <!-- Bento Card 2: Image Tuning -->
-          <section class="bento-card" id="card-imagetuning">
+          <!-- Bento Card 2: Display & Ambience -->
+          <section class="bento-card" id="card-display-ambient">
             <div class="bento-card-header">
-              <h2 class="card-title">Image Tuning</h2>
+              <h2 class="card-title">Display & Ambience</h2>
+              <div style="display:flex;align-items:center;gap:6px;">
+                <span class="card-badge" id="bright-badge">128 (50%)</span>
+                <button type="button" id="btn-reset-brightness" class="btn-param" style="padding:2px 8px;font-size:10px;border-radius:10px;height:22px;line-height:1;" title="Reset to Default (50%)">↺ Reset</button>
+              </div>
             </div>
             <div class="form-section" style="padding:10px 12px;margin-bottom:0;">
+              <div class="form-group" style="margin-bottom:6px;">
+                <label>OLED Brightness</label>
+                <input type="range" id="oled-brightness-slider" min="0" max="255" value="128" style="width:100%;cursor:pointer;accent-color:var(--accent-dark);">
+              </div>
+              <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text-muted);margin-bottom:12px;">
+                <span>0% (Off)</span>
+                <span>50% (Default)</span>
+                <span>100% (Max)</span>
+              </div>
               <div class="form-group" style="margin-bottom:8px;">
-                <label>Brightness</label>
-                <div style="display:flex;gap:4px;">
-                  <button type="button" class="btn-cam-param" data-param="brightness" data-val="-2">-2</button>
-                  <button type="button" class="btn-cam-param" data-param="brightness" data-val="-1">-1</button>
-                  <button type="button" class="btn-cam-param active" data-param="brightness" data-val="0">0</button>
-                  <button type="button" class="btn-cam-param" data-param="brightness" data-val="1">+1</button>
-                  <button type="button" class="btn-cam-param" data-param="brightness" data-val="2">+2</button>
+                <label>Smart Auto-Luminance</label>
+                <div style="display:flex;gap:6px;">
+                  <button type="button" id="btn-auto-bright-toggle" class="btn-toggle" style="padding:6px 12px;font-size:11px;">Auto-Brightness: OFF</button>
                 </div>
               </div>
               <div class="form-group" style="margin-bottom:0;">
-                <label>Contrast</label>
-                <div style="display:flex;gap:4px;">
-                  <button type="button" class="btn-cam-param" data-param="contrast" data-val="-2">-2</button>
-                  <button type="button" class="btn-cam-param" data-param="contrast" data-val="-1">-1</button>
-                  <button type="button" class="btn-cam-param active" data-param="contrast" data-val="0">0</button>
-                  <button type="button" class="btn-cam-param" data-param="contrast" data-val="1">+1</button>
-                  <button type="button" class="btn-cam-param" data-param="contrast" data-val="2">+2</button>
+                <label>Test Glance Popups</label>
+                <div style="display:flex;gap:6px;">
+                  <button type="button" id="btn-trigger-clock" class="btn-param" style="padding:6px 10px;font-size:11px;">Clock Glance</button>
+                  <button type="button" id="btn-trigger-weather" class="btn-param" style="padding:6px 10px;font-size:11px;">Weather Glance</button>
                 </div>
               </div>
             </div>
@@ -931,7 +950,7 @@ static const char HTML_PAGE[] PROGMEM = R"rawliteral(<!DOCTYPE html>
 
         </div>
 
-        <!-- Right Bento Column: AI Metrics, Expression Rig, OLED Brightness, Orientation & Exposure -->
+        <!-- Right Bento Column: Telemetry, Expression, Cognition -->
         <div class="bento-col">
           
           <!-- Bento Card 1: AI Telemetry -->
@@ -992,45 +1011,34 @@ static const char HTML_PAGE[] PROGMEM = R"rawliteral(<!DOCTYPE html>
             <button type="button" id="btn-expr-auto" class="btn-expr-auto active">Default (Auto Mood)</button>
           </section>
 
-          <!-- Bento Card 3: OLED Display & Live Brightness Rig -->
-          <section class="bento-card" id="card-brightness">
+          <!-- Bento Card 3: Cognitive & Neural State -->
+          <section class="bento-card" id="card-cognition">
             <div class="bento-card-header">
-              <h2 class="card-title">OLED Brightness</h2>
-              <div style="display:flex;align-items:center;gap:6px;">
-                <span class="card-badge" id="bright-badge">128 (50%)</span>
-                <button type="button" id="btn-reset-brightness" class="btn-cam-param" style="padding:2px 8px;font-size:10px;border-radius:10px;height:22px;line-height:1;" title="Reset to Default (50%)">↺ Reset</button>
-              </div>
+              <h2 class="card-title">Cognitive & Neural State</h2>
             </div>
-            <div class="form-section" style="padding:10px 12px;">
-              <div class="form-group" style="margin-bottom:6px;">
-                <input type="range" id="oled-brightness-slider" min="0" max="255" value="128" style="width:100%;cursor:pointer;accent-color:var(--accent-dark);">
+            <div class="form-section" style="padding:10px 12px;margin-bottom:0;">
+              <div style="margin-bottom:10px;">
+                <div style="font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.03em;margin-bottom:4px;">Inner Monologue</div>
+                <div id="tel-thought" style="font-size:12px;font-style:italic;color:var(--text-main);background:var(--bg-surface);padding:8px 10px;border-radius:var(--radius-sub);min-height:32px;display:flex;align-items:center;">"Pondering surrounding reality..."</div>
               </div>
-              <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text-muted);">
-                <span>0% (Off)</span>
-                <span>50% (Default)</span>
-                <span>100% (Max)</span>
-              </div>
-            </div>
-          </section>
-
-          <!-- Bento Card 4: Orientation & Exposure Rig -->
-          <section class="bento-card" id="card-orientation">
-            <div class="bento-card-header">
-              <h2 class="card-title">Orientation & Exposure</h2>
-            </div>
-            <div class="form-section" style="padding:10px 12px;">
-              <div class="form-group" style="margin-bottom:8px;">
-                <label>Hardware Flip</label>
-                <div style="display:flex;gap:6px;">
-                  <button type="button" id="btn-vflip" class="btn-cam-toggle active" data-param="vflip" data-state="1">V-Flip</button>
-                  <button type="button" id="btn-hmirror" class="btn-cam-toggle active" data-param="hmirror" data-state="1">H-Mirror</button>
+              <div class="metrics-grid" style="grid-template-columns: repeat(3, 1fr);gap:6px;">
+                <div class="metric-box" style="padding:8px 6px;">
+                  <span class="metric-label">Bonding</span>
+                  <div class="metric-value-row">
+                    <span id="tel-bonding" class="metric-number" style="font-size:15px;">0%</span>
+                  </div>
                 </div>
-              </div>
-              <div class="form-group" style="margin-bottom:0;">
-                <label>Auto Exposure (AEC)</label>
-                <div style="display:flex;gap:6px;">
-                  <button type="button" id="btn-aec" class="btn-cam-toggle active" data-param="aec" data-state="1">AEC Auto</button>
-                  <button type="button" id="btn-agc" class="btn-cam-toggle active" data-param="agc" data-state="1">AGC Gain</button>
+                <div class="metric-box" style="padding:8px 6px;">
+                  <span class="metric-label">Energy</span>
+                  <div class="metric-value-row">
+                    <span id="tel-energy" class="metric-number" style="font-size:15px;">100%</span>
+                  </div>
+                </div>
+                <div class="metric-box" style="padding:8px 6px;">
+                  <span class="metric-label">Curiosity</span>
+                  <div class="metric-value-row">
+                    <span id="tel-curiosity" class="metric-number" style="font-size:15px;">0%</span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1222,7 +1230,7 @@ static const char HTML_PAGE[] PROGMEM = R"rawliteral(<!DOCTYPE html>
             <div class="form-section">
               <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
                 <div class="form-section-title" style="margin-bottom:0;">Geographical Coordinates</div>
-                <button type="button" id="btn-gps-location" class="btn-cam-param" style="flex:none;width:auto;padding:4px 10px;font-size:11px;border-radius:12px;height:26px;display:flex;align-items:center;gap:5px;" title="Detect GPS Coordinates">
+                <button type="button" id="btn-gps-location" class="btn-param" style="flex:none;width:auto;padding:4px 10px;font-size:11px;border-radius:12px;height:26px;display:flex;align-items:center;gap:5px;" title="Detect GPS Coordinates">
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
                   <span>My GPS</span>
                 </button>
@@ -1264,7 +1272,7 @@ static const char HTML_PAGE[] PROGMEM = R"rawliteral(<!DOCTYPE html>
               <label for="ntfy-topic-input">Ntfy.sh Topic Name (Unique / Private)</label>
               <div style="display:flex;gap:6px;">
                 <input type="text" id="ntfy-topic-input" placeholder="e.g. lore_notif_myphone123" value="lore_notif_default" style="flex:1;">
-                <button type="button" id="btn-save-ntfy" class="btn-cam-toggle active" style="flex:none;padding:0 14px;border-radius:10px;">Save Topic</button>
+                <button type="button" id="btn-save-ntfy" class="btn-toggle active" style="flex:none;padding:0 14px;border-radius:10px;">Save Topic</button>
               </div>
             </div>
 
@@ -1276,7 +1284,7 @@ static const char HTML_PAGE[] PROGMEM = R"rawliteral(<!DOCTYPE html>
               <b style="color:var(--text-main);">Cara Hubungkan ke HP (Android / iPhone):</b><br>
               1. <b>Metode MacroDroid / Tasker:</b> Buat Trigger <i>"Notification Received"</i> (WhatsApp/Telegram), lalu Action <i>"HTTP Request POST"</i> ke <code style="background:var(--bg-card);padding:2px 4px;border-radius:4px;" id="code-ntfy-url">https://ntfy.sh/lore_notif_default</code> dengan Header <code style="background:var(--bg-card);padding:2px 4px;border-radius:4px;">Title: [notif_title]</code> dan Body <code style="background:var(--bg-card);padding:2px 4px;border-radius:4px;">[notif_body]</code>.<br>
               2. <b>Metode App ntfy:</b> Download app <b>ntfy</b> di Play Store/App Store, lalu publish pesan ke topik Anda.<br>
-              3. <b>Metode Webhook Lokal:</b> POST ke <code style="background:var(--bg-card);padding:2px 4px;border-radius:4px;" id="code-local-url">http://kore.local/api/notify</code> (JSON: <code style="background:var(--bg-card);padding:2px 4px;border-radius:4px;">{"sender":"Budi","message":"Halo"}</code>).<br>
+              3. <b>Metode Webhook Lokal:</b> POST ke <code style="background:var(--bg-card);padding:2px 4px;border-radius:4px;" id="code-local-url">http://lore.local/api/notify</code> (JSON: <code style="background:var(--bg-card);padding:2px 4px;border-radius:4px;">{"sender":"Budi","message":"Halo"}</code>).<br>
               4. <b>Metode Bluetooth BLE (Offline / Outdoor):</b> Kirim teks notifikasi langsung ke Bluetooth <b>LoRe-Sense</b> via Plugin Serial Bluetooth di MacroDroid (format: <code style="background:var(--bg-card);padding:2px 4px;border-radius:4px;">[WA] {not_title}: {not_body}</code>).
             </div>
           </div>
@@ -1291,8 +1299,8 @@ static const char HTML_PAGE[] PROGMEM = R"rawliteral(<!DOCTYPE html>
       <p style="margin-top:4px;"><a id="toggle-privacy">Privacy Policy</a> &bull; <a id="toggle-terms">Terms of Service</a></p>
       <div id="legal-content" class="legal-modal">
         <strong>Terms of Service & Privacy Policy:</strong><br>
-        1. Data Processing: All computer vision inference, YCbCr classification, and oculomotor dynamics are executed locally in ESP32-S3 internal SRAM.<br>
-        2. Privacy: No camera image data, video stream frames, or Wi-Fi credentials are sent to external third-party cloud servers.<br>
+        1. Data Processing: All affective cognition, minimum-jerk kinematics, and oculomotor dynamics are executed locally in ESP32-S3 internal SRAM.<br>
+        2. Privacy: No private sensor data or Wi-Fi credentials are sent to external third-party cloud servers.<br>
         3. Credentials: Access Point and STA credentials are stored securely in local device NVS Flash.
       </div>
     </footer>
@@ -1300,41 +1308,282 @@ static const char HTML_PAGE[] PROGMEM = R"rawliteral(<!DOCTYPE html>
   </div>
 
   <script>
-    const host = window.location.hostname || '192.168.18.16';
-    const streamPort = 81;
-    const streamProto = (window.location.protocol === 'https:') ? 'https:' : 'http:';
-    const streamBaseUrl = `${streamProto}//${host}:${streamPort}/stream`;
+    /* Gaze Steering Pad & Radar Setup */
+    const gazeCanvas = document.getElementById('gaze-canvas');
+    const gazeCtx = gazeCanvas ? gazeCanvas.getContext('2d') : null;
+    const gazeViewport = document.getElementById('gaze-viewport');
+    const gazeCoordsBadge = document.getElementById('gaze-coords');
 
-    const img = document.getElementById('stream-img');
-    const skeleton = document.getElementById('stream-skeleton');
-    const canvas = document.getElementById('hud-canvas');
-    const ctx = canvas.getContext('2d');
+    let userGazeTarget = { x: 0, y: 0, active: false, activeUntil: 0 };
+    let robotGazeState = { x: 0, y: 0, detected: false };
+    let gazeTrail = [];
 
-    img.src = streamBaseUrl;
-    
-    img.onload = function() {
-      if (skeleton) skeleton.style.display = 'none';
-      resizeCanvas();
-    };
-
-    img.onerror = function() {
-      if (skeleton) skeleton.style.display = 'flex';
-      setTimeout(function() {
-        img.src = `${streamBaseUrl}?t=` + Date.now();
-      }, 1500);
-    };
-
-    function resizeCanvas() {
-      const w = img.clientWidth || img.offsetWidth || 0;
-      const h = img.clientHeight || img.offsetHeight || 0;
+    function resizeGazeCanvas() {
+      if (!gazeViewport || !gazeCanvas) return;
+      const rect = gazeViewport.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
+      const w = Math.round(rect.width);
+      const h = Math.round(rect.height);
       if (w > 0 && h > 0) {
-        if (canvas.width !== w || canvas.height !== h) {
-          canvas.width = w;
-          canvas.height = h;
+        if (gazeCanvas.width !== w * dpr || gazeCanvas.height !== h * dpr) {
+          gazeCanvas.width = w * dpr;
+          gazeCanvas.height = h * dpr;
         }
       }
+      renderGazeRadar();
     }
-    window.addEventListener('resize', resizeCanvas);
+    window.addEventListener('resize', resizeGazeCanvas);
+
+    function renderGazeRadar() {
+      if (!gazeCanvas || !gazeCtx) return;
+      const dpr = window.devicePixelRatio || 1;
+      const w = gazeCanvas.width / dpr;
+      const h = gazeCanvas.height / dpr;
+      if (w <= 0 || h <= 0) return;
+
+      gazeCtx.save();
+      gazeCtx.scale(dpr, dpr);
+      gazeCtx.clearRect(0, 0, w, h);
+
+      const cx = w / 2;
+      const cy = h / 2;
+      const maxR = Math.min(w, h) * 0.44;
+
+      // 1. Concentric Range Rings (25%, 50%, 75%, 100%) - Subtle Monochrome
+      const rings = [0.25, 0.50, 0.75, 1.0];
+      rings.forEach((pct, idx) => {
+        gazeCtx.beginPath();
+        gazeCtx.arc(cx, cy, maxR * pct, 0, Math.PI * 2);
+        if (idx === 3) {
+          gazeCtx.strokeStyle = 'rgba(25, 28, 32, 0.26)';
+          gazeCtx.lineWidth = 1.5;
+          gazeCtx.setLineDash([]);
+        } else {
+          gazeCtx.strokeStyle = 'rgba(25, 28, 32, 0.09)';
+          gazeCtx.lineWidth = 1.0;
+          gazeCtx.setLineDash([3, 4]);
+        }
+        gazeCtx.stroke();
+      });
+
+      // 2. Crosshair Axes & Sub-Ticks
+      gazeCtx.setLineDash([4, 4]);
+      gazeCtx.strokeStyle = 'rgba(25, 28, 32, 0.14)';
+      gazeCtx.lineWidth = 1.0;
+      gazeCtx.beginPath();
+      gazeCtx.moveTo(cx - maxR, cy);
+      gazeCtx.lineTo(cx + maxR, cy);
+      gazeCtx.moveTo(cx, cy - maxR);
+      gazeCtx.lineTo(cx, cy + maxR);
+      gazeCtx.stroke();
+
+      // Half-radius sub-ticks
+      gazeCtx.setLineDash([]);
+      gazeCtx.strokeStyle = 'rgba(25, 28, 32, 0.20)';
+      gazeCtx.lineWidth = 1.0;
+      gazeCtx.beginPath();
+      const rHalf = maxR * 0.5;
+      gazeCtx.moveTo(cx - 3, cy - rHalf); gazeCtx.lineTo(cx + 3, cy - rHalf);
+      gazeCtx.moveTo(cx - 3, cy + rHalf); gazeCtx.lineTo(cx + 3, cy + rHalf);
+      gazeCtx.moveTo(cx - rHalf, cy - 3); gazeCtx.lineTo(cx - rHalf, cy + 3);
+      gazeCtx.moveTo(cx + rHalf, cy - 3); gazeCtx.lineTo(cx + rHalf, cy + 3);
+      gazeCtx.stroke();
+
+      // 3. Coordinate Labels
+      gazeCtx.fillStyle = 'rgba(25, 28, 32, 0.42)';
+      gazeCtx.font = '700 8.5px "Plus Jakarta Sans", monospace, sans-serif';
+      gazeCtx.textAlign = 'center';
+      gazeCtx.textBaseline = 'bottom';
+      gazeCtx.fillText('UP (-1.0)', cx, cy - maxR - 4);
+      gazeCtx.textBaseline = 'top';
+      gazeCtx.fillText('DOWN (+1.0)', cx, cy + maxR + 4);
+      gazeCtx.textAlign = 'right';
+      gazeCtx.textBaseline = 'middle';
+      gazeCtx.fillText('LEFT', cx - maxR - 6, cy);
+      gazeCtx.textAlign = 'left';
+      gazeCtx.fillText('RIGHT', cx + maxR + 6, cy);
+
+      // 4. Center Anchor Dot
+      gazeCtx.beginPath();
+      gazeCtx.arc(cx, cy, 2.5, 0, Math.PI * 2);
+      gazeCtx.fillStyle = 'rgba(25, 28, 32, 0.35)';
+      gazeCtx.fill();
+
+      // 5. Gaze Motion Trail
+      if (gazeTrail.length > 1) {
+        gazeCtx.beginPath();
+        gazeCtx.moveTo(cx + gazeTrail[0].x * maxR, cy + gazeTrail[0].y * maxR);
+        for (let i = 1; i < gazeTrail.length; i++) {
+          gazeCtx.lineTo(cx + gazeTrail[i].x * maxR, cy + gazeTrail[i].y * maxR);
+        }
+        gazeCtx.strokeStyle = 'rgba(25, 28, 32, 0.18)';
+        gazeCtx.lineWidth = 1.5;
+        gazeCtx.setLineDash([3, 3]);
+        gazeCtx.stroke();
+        gazeCtx.setLineDash([]);
+      }
+
+      // 6. Robot Autonomous Gaze Focus Reticle (Solid Ink Black)
+      const robotScreenX = cx + robotGazeState.x * maxR;
+      const robotScreenY = cy + robotGazeState.y * maxR;
+
+      // Soft radial shadow halo
+      const grad = gazeCtx.createRadialGradient(robotScreenX, robotScreenY, 2, robotScreenX, robotScreenY, 18);
+      grad.addColorStop(0, 'rgba(25, 28, 32, 0.10)');
+      grad.addColorStop(0.6, 'rgba(25, 28, 32, 0.03)');
+      grad.addColorStop(1, 'rgba(25, 28, 32, 0)');
+      gazeCtx.fillStyle = grad;
+      gazeCtx.beginPath();
+      gazeCtx.arc(robotScreenX, robotScreenY, 18, 0, Math.PI * 2);
+      gazeCtx.fill();
+
+      // Outer reticle ring
+      gazeCtx.strokeStyle = '#191c20';
+      gazeCtx.lineWidth = 2;
+      gazeCtx.beginPath();
+      gazeCtx.arc(robotScreenX, robotScreenY, 8, 0, Math.PI * 2);
+      gazeCtx.stroke();
+
+      // Inner pupil dot with white center
+      gazeCtx.fillStyle = '#191c20';
+      gazeCtx.beginPath();
+      gazeCtx.arc(robotScreenX, robotScreenY, 4, 0, Math.PI * 2);
+      gazeCtx.fill();
+
+      gazeCtx.fillStyle = '#ffffff';
+      gazeCtx.beginPath();
+      gazeCtx.arc(robotScreenX, robotScreenY, 1.5, 0, Math.PI * 2);
+      gazeCtx.fill();
+
+      // Reticle Tag
+      gazeCtx.font = '700 9px "Plus Jakarta Sans", monospace, sans-serif';
+      gazeCtx.fillStyle = '#191c20';
+      gazeCtx.textAlign = 'left';
+      gazeCtx.textBaseline = 'bottom';
+      gazeCtx.fillText('GAZE', robotScreenX + 11, robotScreenY - 2);
+
+      // 7. Interactive User Target Pointer (Monochrome)
+      const now = Date.now();
+      if (userGazeTarget.active && now < userGazeTarget.activeUntil) {
+        const uScreenX = cx + userGazeTarget.x * maxR;
+        const uScreenY = cy + userGazeTarget.y * maxR;
+
+        // Dashed targeting ring
+        gazeCtx.strokeStyle = '#191c20';
+        gazeCtx.lineWidth = 1.5;
+        gazeCtx.setLineDash([4, 3]);
+        gazeCtx.beginPath();
+        gazeCtx.arc(uScreenX, uScreenY, 13, 0, Math.PI * 2);
+        gazeCtx.stroke();
+        gazeCtx.setLineDash([]);
+
+        // Crosshair ticks
+        gazeCtx.strokeStyle = '#191c20';
+        gazeCtx.lineWidth = 1.5;
+        gazeCtx.beginPath();
+        gazeCtx.moveTo(uScreenX - 17, uScreenY);
+        gazeCtx.lineTo(uScreenX - 6, uScreenY);
+        gazeCtx.moveTo(uScreenX + 6, uScreenY);
+        gazeCtx.lineTo(uScreenX + 17, uScreenY);
+        gazeCtx.moveTo(uScreenX, uScreenY - 17);
+        gazeCtx.lineTo(uScreenX, uScreenY - 6);
+        gazeCtx.moveTo(uScreenX, uScreenY + 6);
+        gazeCtx.lineTo(uScreenX, uScreenY + 17);
+        gazeCtx.stroke();
+
+        // Target center point
+        gazeCtx.fillStyle = '#191c20';
+        gazeCtx.beginPath();
+        gazeCtx.arc(uScreenX, uScreenY, 2, 0, Math.PI * 2);
+        gazeCtx.fill();
+
+        // Monochrome Pill Badge
+        const tagX = uScreenX + 9;
+        const tagY = uScreenY + 7;
+        const tagW = 42;
+        const tagH = 15;
+        const tagR = 4;
+        gazeCtx.fillStyle = '#191c20';
+        gazeCtx.beginPath();
+        if (typeof gazeCtx.roundRect === 'function') {
+          gazeCtx.roundRect(tagX, tagY, tagW, tagH, tagR);
+        } else {
+          gazeCtx.rect(tagX, tagY, tagW, tagH);
+        }
+        gazeCtx.fill();
+
+        gazeCtx.fillStyle = '#ffffff';
+        gazeCtx.font = '700 8.5px "Plus Jakarta Sans", monospace, sans-serif';
+        gazeCtx.textAlign = 'center';
+        gazeCtx.textBaseline = 'middle';
+        gazeCtx.fillText('TARGET', tagX + tagW / 2, tagY + tagH / 2);
+      }
+
+      gazeCtx.restore();
+    }
+
+    let isGazeDragging = false;
+    let lastGazeSendMs = 0;
+
+    function handleGazeInteraction(clientX, clientY, persistMs = 3500) {
+      if (!gazeViewport) return;
+      const rect = gazeViewport.getBoundingClientRect();
+      const normX = Math.max(-1.0, Math.min(1.0, ((clientX - rect.left) / rect.width) * 2.0 - 1.0));
+      const normY = Math.max(-1.0, Math.min(1.0, ((clientY - rect.top) / rect.height) * 2.0 - 1.0));
+
+      userGazeTarget.x = normX;
+      userGazeTarget.y = normY;
+      userGazeTarget.active = true;
+      userGazeTarget.activeUntil = Date.now() + persistMs;
+
+      if (gazeCoordsBadge) {
+        const sx = normX >= 0 ? '+' : '';
+        const sy = normY >= 0 ? '+' : '';
+        gazeCoordsBadge.innerText = `X: ${sx}${normX.toFixed(2)} | Y: ${sy}${normY.toFixed(2)}`;
+      }
+
+      renderGazeRadar();
+
+      const now = Date.now();
+      if (now - lastGazeSendMs > 50) {
+        lastGazeSendMs = now;
+        fetch('/set_gaze', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ x: normX, y: normY, duration_ms: persistMs })
+        }).catch(() => {});
+      }
+    }
+
+    if (gazeViewport) {
+      gazeViewport.addEventListener('pointerdown', e => {
+        isGazeDragging = true;
+        try { gazeViewport.setPointerCapture(e.pointerId); } catch (_) {}
+        handleGazeInteraction(e.clientX, e.clientY);
+      });
+      gazeViewport.addEventListener('pointermove', e => {
+        if (isGazeDragging) {
+          handleGazeInteraction(e.clientX, e.clientY);
+        }
+      });
+      const endGaze = e => {
+        if (isGazeDragging) {
+          isGazeDragging = false;
+          try { gazeViewport.releasePointerCapture(e.pointerId); } catch (_) {}
+        }
+      };
+      gazeViewport.addEventListener('pointerup', endGaze);
+      gazeViewport.addEventListener('pointercancel', endGaze);
+    }
+
+    const btnCenterGaze = document.getElementById('btn-center-gaze');
+    if (btnCenterGaze) {
+      btnCenterGaze.addEventListener('click', () => {
+        if (!gazeViewport) return;
+        const rect = gazeViewport.getBoundingClientRect();
+        handleGazeInteraction(rect.left + rect.width / 2, rect.top + rect.height / 2, 2000);
+      });
+    }
 
     /* Automatic Browser Time Synchronization (Supports AP mode & offline usage) */
     function syncDeviceTime() {
@@ -1360,257 +1609,16 @@ static const char HTML_PAGE[] PROGMEM = R"rawliteral(<!DOCTYPE html>
         this.classList.add('active');
         const targetPane = document.getElementById(targetId);
         if (targetPane) targetPane.classList.add('active');
-        if (targetId === 'tab-vision') {
-          setTimeout(resizeCanvas, 40);
+        if (targetId === 'tab-control') {
+          setTimeout(resizeGazeCanvas, 40);
         }
       });
     });
 
-    /* Cyber VFX Motion Tracker State */
-    let renderBoxes = [];
-    let trajectoryTrail = [];   // Motion trajectory history [{cx, cy, rawX, rawY, time}]
-    let sparkNodes = [];        // Dynamic spark/particle cluster sub-nodes
+    setTimeout(resizeGazeCanvas, 80);
+
+    /* Telemetry State & Periodic Fetch */
     let telemetryTimer = null;
-    let lastData = null;
-
-    /**
-     * Draw directional chevron arrow along a curve or vector
-     */
-    function drawCurveArrow(ctx, x, y, angle, size = 6.5, color = 'rgba(255, 255, 255, 0.95)') {
-      ctx.save();
-      ctx.translate(x, y);
-      ctx.rotate(angle);
-      ctx.strokeStyle = color;
-      ctx.fillStyle = color;
-      ctx.lineWidth = 1.6;
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'miter';
-      ctx.setLineDash([]);
-      ctx.beginPath();
-      ctx.moveTo(-size, -size * 0.55);
-      ctx.lineTo(0, 0);
-      ctx.lineTo(-size, size * 0.55);
-      ctx.stroke();
-      ctx.restore();
-    }
-
-    /**
-     * Cyber Motion Tracker Bounding Box + Center Dot + Coordinates (x: ... y: ...)
-     */
-    function drawCyberTrackerBox(ctx, bx, by, bw, bh, rawX, rawY, isPrimary = true) {
-      ctx.save();
-
-      // 1. Crisp Green Bounding Box
-      ctx.strokeStyle = '#00ff66';
-      ctx.lineWidth = isPrimary ? 1.6 : 1.2;
-      ctx.shadowColor = 'rgba(0, 255, 102, 0.6)';
-      ctx.shadowBlur = 3;
-      ctx.setLineDash([]);
-      ctx.strokeRect(bx, by, bw, bh);
-
-      // 2. Solid Green Center Dot
-      const cx = bx + bw / 2;
-      const cy = by + bh / 2;
-      ctx.fillStyle = '#00ff66';
-      ctx.beginPath();
-      ctx.arc(cx, cy, isPrimary ? 3.0 : 2.2, 0, 2 * Math.PI);
-      ctx.fill();
-
-      // 3. Coordinate Label (x: ... y: ...)
-      ctx.shadowColor = 'rgba(0, 0, 0, 0.95)';
-      ctx.shadowBlur = 4;
-      ctx.fillStyle = '#ffffff';
-      ctx.font = '600 11.5px "Plus Jakarta Sans", monospace, sans-serif';
-      ctx.textAlign = 'left';
-      ctx.textBaseline = 'bottom';
-
-      const coordText = `x: ${Math.round(rawX)}  y: ${Math.round(rawY)}`;
-      ctx.fillText(coordText, bx, by - 3);
-
-      ctx.restore();
-    }
-
-    /**
-     * Draw dashed curved trajectory path connecting historical points with directional arrows
-     */
-    function drawTrajectoryTrail(ctx, trail) {
-      if (!trail || trail.length < 2) return;
-      const validTrail = trail.filter(p => p && Number.isFinite(p.cx) && Number.isFinite(p.cy));
-      if (validTrail.length < 2) return;
-
-      ctx.save();
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
-      ctx.lineWidth = 1.2;
-      ctx.setLineDash([6, 5]);
-      ctx.shadowColor = 'rgba(0, 0, 0, 0.6)';
-      ctx.shadowBlur = 3;
-
-      ctx.beginPath();
-      ctx.moveTo(validTrail[0].cx, validTrail[0].cy);
-
-      for (let i = 1; i < validTrail.length; i++) {
-        const pPrev = validTrail[i - 1];
-        const pCurr = validTrail[i];
-        const midX = (pPrev.cx + pCurr.cx) / 2;
-        const midY = (pPrev.cy + pCurr.cy) / 2;
-        ctx.quadraticCurveTo(pPrev.cx, pPrev.cy, midX, midY);
-      }
-      ctx.stroke();
-
-      // Draw directional arrows along trajectory segments
-      const step = Math.max(1, Math.floor(validTrail.length / 3));
-      for (let i = step; i < validTrail.length; i += step) {
-        const p1 = validTrail[i - 1];
-        const p2 = validTrail[i];
-        const dx = p2.cx - p1.cx;
-        const dy = p2.cy - p1.cy;
-        const dist = Math.hypot(dx, dy);
-        if (dist > 10) {
-          const angle = Math.atan2(dy, dx);
-          const midX = (p1.cx + p2.cx) / 2;
-          const midY = (p1.cy + p2.cy) / 2;
-          drawCurveArrow(ctx, midX, midY, angle, 6.5, 'rgba(255, 255, 255, 0.95)');
-        }
-      }
-
-      ctx.restore();
-    }
-
-    /**
-     * Draw arched dashed curves connecting multiple detected targets/candidates with flow arrows
-     */
-    function drawInterTargetArcs(ctx, targets) {
-      if (!targets || targets.length < 2) return;
-      const validTargets = targets.filter(t => t && Number.isFinite(t.cx) && Number.isFinite(t.cy));
-      if (validTargets.length < 2) return;
-
-      ctx.save();
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.75)';
-      ctx.lineWidth = 1.2;
-      ctx.setLineDash([6, 5]);
-
-      for (let i = 0; i < validTargets.length; i++) {
-        for (let j = i + 1; j < validTargets.length; j++) {
-          const t1 = validTargets[i];
-          const t2 = validTargets[j];
-          const x1 = t1.cx, y1 = t1.cy;
-          const x2 = t2.cx, y2 = t2.cy;
-          const dx = x2 - x1, dy = y2 - y1;
-          const dist = Math.hypot(dx, dy);
-          if (dist < 20) continue;
-
-          const mx = (x1 + x2) / 2;
-          const my = (y1 + y2) / 2;
-          const nx = -dy / dist;
-          const ny = dx / dist;
-
-          // Upper Arc (curved upward)
-          const archH = Math.min(65, Math.max(25, dist * 0.22));
-          const cpx1 = mx + nx * archH;
-          const cpy1 = my + ny * archH;
-
-          ctx.beginPath();
-          ctx.moveTo(x1, y1);
-          ctx.quadraticCurveTo(cpx1, cpy1, x2, y2);
-          ctx.stroke();
-
-          // Arrow on upper arc
-          const arrowAngle1 = Math.atan2(y2 - y1, x2 - x1);
-          const apexX1 = 0.25 * x1 + 0.5 * cpx1 + 0.25 * x2;
-          const apexY1 = 0.25 * y1 + 0.5 * cpy1 + 0.25 * y2;
-          drawCurveArrow(ctx, apexX1, apexY1, arrowAngle1 + Math.PI, 6.5, 'rgba(255, 255, 255, 0.9)');
-
-          // If 2 targets, also draw lower arc
-          if (validTargets.length === 2) {
-            const cpx2 = mx - nx * archH;
-            const cpy2 = my - ny * archH;
-
-            ctx.beginPath();
-            ctx.moveTo(x1, y1);
-            ctx.quadraticCurveTo(cpx2, cpy2, x2, y2);
-            ctx.stroke();
-
-            const apexX2 = 0.25 * x1 + 0.5 * cpx2 + 0.25 * x2;
-            const apexY2 = 0.25 * y1 + 0.5 * cpy2 + 0.25 * y2;
-            drawCurveArrow(ctx, apexX2, apexY2, arrowAngle1, 6.5, 'rgba(255, 255, 255, 0.9)');
-          }
-        }
-      }
-
-      ctx.restore();
-    }
-
-    /**
-     * Generate & render spark sub-nodes for dense multi-point cluster visual
-     */
-    function renderSparkClusters(ctx, cands, primaryTarget, scaleX, scaleY, now) {
-      const activeCands = (cands || []).filter(c => c && c.cx > 0);
-      if (activeCands.length === 0 && (!primaryTarget || !primaryTarget.detected || !primaryTarget.cx)) {
-        sparkNodes = [];
-        return;
-      }
-
-      const fallbackParent = activeCands[0] || (primaryTarget && primaryTarget.cx ? primaryTarget : null);
-      if (!fallbackParent) {
-        sparkNodes = [];
-        return;
-      }
-
-      const totalNodes = activeCands.length > 1 ? 6 : (primaryTarget && primaryTarget.detected ? 4 : 0);
-      if (totalNodes === 0) return;
-
-      while (sparkNodes.length < totalNodes) {
-        const pIdx = sparkNodes.length % (activeCands.length || 1);
-        const parent = activeCands[pIdx] || fallbackParent;
-        const angle = (sparkNodes.length * 1.57) + Math.random() * 0.8;
-        const dist = 24 + Math.random() * 45;
-        sparkNodes.push({
-          ox: Math.cos(angle) * dist,
-          oy: Math.sin(angle) * dist,
-          bw: 22 + Math.floor(Math.random() * 20),
-          bh: 22 + Math.floor(Math.random() * 20),
-          parentIdx: pIdx,
-          phase: Math.random() * 6.28
-        });
-      }
-      if (sparkNodes.length > totalNodes) sparkNodes.length = totalNodes;
-
-      for (let i = 0; i < sparkNodes.length; i++) {
-        const node = sparkNodes[i];
-        const pIdx = node.parentIdx % (activeCands.length || 1);
-        const parent = activeCands[pIdx] || fallbackParent;
-        if (!parent || !parent.cx || !parent.cy) continue;
-
-        const wobbleX = Math.sin(now * 0.003 + node.phase) * 6;
-        const wobbleY = Math.cos(now * 0.003 + node.phase) * 6;
-
-        const rawX = Math.max(10, Math.min(630, parent.cx + node.ox + wobbleX));
-        const rawY = Math.max(10, Math.min(470, parent.cy + node.oy + wobbleY));
-
-        const screenX = rawX * scaleX;
-        const screenY = rawY * scaleY;
-        const screenW = node.bw * scaleX;
-        const screenH = node.bh * scaleY;
-
-        drawCyberTrackerBox(ctx, screenX - screenW / 2, screenY - screenH / 2, screenW, screenH, rawX, rawY, false);
-
-        // Dashed connector line with arrow towards spark node
-        ctx.save();
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
-        ctx.lineWidth = 1.0;
-        ctx.setLineDash([4, 4]);
-        ctx.beginPath();
-        ctx.moveTo(parent.cx * scaleX, parent.cy * scaleY);
-        ctx.lineTo(screenX, screenY);
-        ctx.stroke();
-
-        const midX = (parent.cx * scaleX + screenX) / 2;
-        const midY = (parent.cy * scaleY + screenY) / 2;
-        const angle = Math.atan2(screenY - parent.cy * scaleY, screenX - parent.cx * scaleX);
-        drawCurveArrow(ctx, midX, midY, angle, 5.0, 'rgba(255, 255, 255, 0.8)');
-        ctx.restore();
-      }
-    }
 
     async function updateTelemetry() {
       if (document.visibilityState === 'hidden') {
@@ -1622,9 +1630,6 @@ static const char HTML_PAGE[] PROGMEM = R"rawliteral(<!DOCTYPE html>
         const res = await fetch('/telemetry');
         if (res.ok) {
           const data = await res.json();
-          lastData = data;
-          resizeCanvas();
-          ctx.clearRect(0, 0, canvas.width, canvas.height);
 
           const elFps = document.getElementById('tel-fps');
           const elConf = document.getElementById('tel-conf');
@@ -1636,94 +1641,62 @@ static const char HTML_PAGE[] PROGMEM = R"rawliteral(<!DOCTYPE html>
           if (elHuman) elHuman.innerText = (data.human_likelihood !== undefined) ? Number(data.human_likelihood).toFixed(2) : '0.00';
           if (elProx) elProx.innerText = (data.prox !== undefined) ? (Number(data.prox) * 100).toFixed(0) + '%' : '0%';
 
-          const now = Date.now();
-
-          if (data.detected && data.fw > 0 && data.fh > 0 && canvas.width > 0 && canvas.height > 0) {
-            const scaleX = canvas.width / data.fw;
-            const scaleY = canvas.height / data.fh;
-
-            const numCands = data.num_cands || 1;
-            const cands = [
-              { cx: data.c0_cx || data.cx, cy: data.c0_cy || data.cy, w: data.c0_w || data.w || 160, h: data.c0_h || data.h || 200, p: data.c0_p || 100 },
-              { cx: data.c1_cx || 0, cy: data.c1_cy || 0, w: data.c1_w || 140, h: data.c1_h || 160, p: data.c1_p || 0 },
-              { cx: data.c2_cx || 0, cy: data.c2_cy || 0, w: data.c2_w || 140, h: data.c2_h || 160, p: data.c2_p || 0 }
-            ];
-
-            // Update motion trajectory history trail for primary target
-            const primCx = data.cx || cands[0].cx;
-            const primCy = data.cy || cands[0].cy;
-            const primScreenX = primCx * scaleX;
-            const primScreenY = primCy * scaleY;
-
-            trajectoryTrail.push({
-              cx: primScreenX,
-              cy: primScreenY,
-              rawX: primCx,
-              rawY: primCy,
-              time: now
-            });
-
-            // Keep recent trajectory trail (last 16 points or 1.2 seconds)
-            trajectoryTrail = trajectoryTrail.filter(p => now - p.time < 1200);
-            if (trajectoryTrail.length > 18) trajectoryTrail.shift();
-
-            // 1. Draw Trajectory Path with directional arrows
-            drawTrajectoryTrail(ctx, trajectoryTrail);
-
-            // 2. Draw Inter-Target connection arcs if multiple candidates detected
-            const detectedTargetsForArcs = [];
-            for (let i = 0; i < numCands; i++) {
-              if (cands[i].cx > 0) {
-                detectedTargetsForArcs.push({
-                  cx: cands[i].cx * scaleX,
-                  cy: cands[i].cy * scaleY,
-                  rawX: cands[i].cx,
-                  rawY: cands[i].cy
-                });
-              }
-            }
-            drawInterTargetArcs(ctx, detectedTargetsForArcs);
-
-            // 3. Render dynamic spark cluster sub-nodes
-            renderSparkClusters(ctx, cands, data, scaleX, scaleY, now);
-
-            // 4. Render Main Target & Candidate Bounding Boxes
-            for (let i = 0; i < numCands; i++) {
-              const cand = cands[i];
-              if (cand.cx <= 0) continue;
-
-              const bw = cand.w || 160;
-              const bh = cand.h || 200;
-
-              const targetBx = (cand.cx - bw / 2) * scaleX;
-              const targetBy = (cand.cy - bh / 2) * scaleY;
-              const targetBw = bw * scaleX;
-              const targetBh = bh * scaleY;
-
-              if (!renderBoxes[i]) {
-                renderBoxes[i] = { bx: targetBx, by: targetBy, bw: targetBw, bh: targetBh, rawX: cand.cx, rawY: cand.cy };
-              } else {
-                renderBoxes[i].bx = renderBoxes[i].bx * 0.25 + targetBx * 0.75;
-                renderBoxes[i].by = renderBoxes[i].by * 0.25 + targetBy * 0.75;
-                renderBoxes[i].bw = renderBoxes[i].bw * 0.25 + targetBw * 0.75;
-                renderBoxes[i].bh = renderBoxes[i].bh * 0.25 + targetBh * 0.75;
-                renderBoxes[i].rawX = cand.cx;
-                renderBoxes[i].rawY = cand.cy;
-              }
-
-              const rBox = renderBoxes[i];
-              const isPrimary = (i === data.insp_idx || i === 0);
-
-              drawCyberTrackerBox(ctx, rBox.bx, rBox.by, rBox.bw, rBox.bh, rBox.rawX, rBox.rawY, isPrimary);
-            }
-          } else {
-            renderBoxes = [];
-            if (trajectoryTrail.length > 0) {
-              trajectoryTrail = trajectoryTrail.filter(p => now - p.time < 600);
-              drawTrajectoryTrail(ctx, trajectoryTrail);
-            }
-            sparkNodes = [];
+          // Live Brightness & Auto-Luminance Sync
+          if (data.brightness !== undefined && isAutoBrightEnabled && !isBrightUpdating) {
+            const b = parseInt(data.brightness, 10);
+            if (brightSlider && brightSlider.value != b) brightSlider.value = b;
+            const pct = Math.round((b / 255) * 100);
+            if (brightBadge) brightBadge.innerText = `${b} (${pct}%)`;
           }
+          if (data.auto_brightness !== undefined && btnAutoBright) {
+            const autoEn = (data.auto_brightness === true || data.auto_brightness === 'true');
+            if (autoEn !== isAutoBrightEnabled) {
+              isAutoBrightEnabled = autoEn;
+              if (autoEn) {
+                btnAutoBright.classList.add('active');
+                btnAutoBright.innerText = 'Auto-Brightness: ON';
+              } else {
+                btnAutoBright.classList.remove('active');
+                btnAutoBright.innerText = 'Auto-Brightness: OFF';
+              }
+            }
+          }
+
+          // Update Cognitive & Neural State
+          const elThought = document.getElementById('tel-thought');
+          const elBonding = document.getElementById('tel-bonding');
+          const elEnergy = document.getElementById('tel-energy');
+          const elCuriosity = document.getElementById('tel-curiosity');
+
+          if (elThought && data.thought) elThought.innerText = `"${data.thought}"`;
+          if (elBonding && data.bonding !== undefined) elBonding.innerText = (Number(data.bonding) * 100).toFixed(0) + '%';
+          if (elEnergy && data.circadian && data.circadian.energy !== undefined) elEnergy.innerText = (Number(data.circadian.energy) * 100).toFixed(0) + '%';
+          if (elCuriosity && data.curiosity !== undefined) elCuriosity.innerText = (Number(data.curiosity) * 100).toFixed(0) + '%';
+
+          // Update Robot Gaze Position & Trajectory on Radar
+          if (data.cx !== undefined && data.cy !== undefined) {
+            const fw = data.fw || 640;
+            const fh = data.fh || 480;
+            const normRx = (data.cx / fw) * 2.0 - 1.0;
+            const normRy = (data.cy / fh) * 2.0 - 1.0;
+            robotGazeState.x = Math.max(-1.0, Math.min(1.0, normRx));
+            robotGazeState.y = Math.max(-1.0, Math.min(1.0, normRy));
+            robotGazeState.detected = !!data.detected;
+
+            const now = Date.now();
+            gazeTrail.push({ x: robotGazeState.x, y: robotGazeState.y, time: now });
+            gazeTrail = gazeTrail.filter(p => now - p.time < 1200);
+            if (gazeTrail.length > 20) gazeTrail.shift();
+
+            if (!userGazeTarget.active || Date.now() >= userGazeTarget.activeUntil) {
+              if (gazeCoordsBadge) {
+                const sx = robotGazeState.x >= 0 ? '+' : '';
+                const sy = robotGazeState.y >= 0 ? '+' : '';
+                gazeCoordsBadge.innerText = `X: ${sx}${robotGazeState.x.toFixed(2)} | Y: ${sy}${robotGazeState.y.toFixed(2)}`;
+              }
+            }
+          }
+          renderGazeRadar();
 
           /* Update active expression indicator */
           const isManual = (data.is_manual === true || data.is_manual === 'true');
@@ -1905,96 +1878,49 @@ static const char HTML_PAGE[] PROGMEM = R"rawliteral(<!DOCTYPE html>
     document.getElementById('toggle-privacy').addEventListener('click', toggleLegal);
     document.getElementById('toggle-terms').addEventListener('click', toggleLegal);
 
-    /* Camera Control Event Handlers */
-    document.querySelectorAll('.btn-cam-param').forEach(btn => {
-      btn.addEventListener('click', function() {
-        const param = this.dataset.param;
-        const val = this.dataset.val;
-        document.querySelectorAll(`.btn-cam-param[data-param="${param}"]`).forEach(b => b.classList.remove('active'));
-        this.classList.add('active');
-        fetch('/camera_control', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ param, val })
-        }).catch(() => {});
-      });
-    });
-
-    document.querySelectorAll('.btn-cam-toggle').forEach(btn => {
-      btn.addEventListener('click', function() {
-        const param = this.dataset.param;
-        let state = parseInt(this.dataset.state, 10);
-        state = (state === 1) ? 0 : 1;
-        this.dataset.state = state;
-        if (state === 1) {
+    /* Auto-Brightness Control */
+    const btnAutoBright = document.getElementById('btn-auto-bright-toggle');
+    let isAutoBrightEnabled = false;
+    if (btnAutoBright) {
+      btnAutoBright.addEventListener('click', function() {
+        isAutoBrightEnabled = !isAutoBrightEnabled;
+        if (isAutoBrightEnabled) {
           this.classList.add('active');
+          this.innerText = 'Auto-Brightness: ON';
         } else {
           this.classList.remove('active');
+          this.innerText = 'Auto-Brightness: OFF';
         }
-        fetch('/camera_control', {
+        fetch('/set_auto_brightness', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ param, val: state })
-        }).catch(() => {});
+          body: JSON.stringify({ enabled: isAutoBrightEnabled })
+        })
+        .then(res => res.json())
+        .then(data => {
+          if (data && data.brightness !== undefined) {
+            const b = parseInt(data.brightness, 10);
+            if (brightSlider) brightSlider.value = b;
+            const pct = Math.round((b / 255) * 100);
+            if (brightBadge) brightBadge.innerText = `${b} (${pct}%)`;
+          }
+        })
+        .catch(() => {});
       });
-    });
+    }
 
-    /* Capture Clean Camera Frame (No Tracker HUD) */
-    const btnCapture = document.getElementById('btn-capture-frame');
-    const btnCaptureText = document.getElementById('btn-capture-text');
-    if (btnCapture) {
-      btnCapture.addEventListener('click', function() {
-        const streamImg = document.getElementById('stream-img');
-        if (!streamImg || !streamImg.complete || streamImg.naturalWidth === 0) {
-          alert('Camera is not active or frame is not ready yet.');
-          return;
-        }
+    /* Ambient Screen Glance Triggers */
+    const btnTrigClock = document.getElementById('btn-trigger-clock');
+    if (btnTrigClock) {
+      btnTrigClock.addEventListener('click', function() {
+        fetch('/trigger_clock', { method: 'POST' }).catch(() => {});
+      });
+    }
 
-        try {
-          const offCanvas = document.createElement('canvas');
-          const w = streamImg.naturalWidth || 640;
-          const h = streamImg.naturalHeight || 480;
-          offCanvas.width = w;
-          offCanvas.height = h;
-
-          const ctx = offCanvas.getContext('2d');
-          // Draw ONLY the raw camera image (no tracker HUD overlay)
-          ctx.drawImage(streamImg, 0, 0, w, h);
-
-          const now = new Date();
-          const pad = n => String(n).padStart(2, '0');
-          const timestamp = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
-          const filename = `LoRe_${timestamp}.jpg`;
-
-          offCanvas.toBlob(blob => {
-            if (!blob) {
-              const dataUrl = offCanvas.toDataURL('image/jpeg', 0.95);
-              const a = document.createElement('a');
-              a.href = dataUrl;
-              a.download = filename;
-              document.body.appendChild(a);
-              a.click();
-              document.body.removeChild(a);
-            } else {
-              const blobUrl = URL.createObjectURL(blob);
-              const a = document.createElement('a');
-              a.href = blobUrl;
-              a.download = filename;
-              document.body.appendChild(a);
-              a.click();
-              document.body.removeChild(a);
-              setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
-            }
-
-            if (btnCaptureText) {
-              const orig = btnCaptureText.innerText;
-              btnCaptureText.innerText = 'Photo Saved!';
-              setTimeout(() => { btnCaptureText.innerText = orig; }, 1500);
-            }
-          }, 'image/jpeg', 0.95);
-        } catch (err) {
-          alert('Failed to capture photo: ' + err.message);
-        }
+    const btnTrigWeather = document.getElementById('btn-trigger-weather');
+    if (btnTrigWeather) {
+      btnTrigWeather.addEventListener('click', function() {
+        fetch('/trigger_weather', { method: 'POST' }).catch(() => {});
       });
     }
 
@@ -2033,12 +1959,22 @@ static const char HTML_PAGE[] PROGMEM = R"rawliteral(<!DOCTYPE html>
 
     if (brightSlider) {
       brightSlider.addEventListener('input', function() {
+        if (isAutoBrightEnabled && btnAutoBright) {
+          isAutoBrightEnabled = false;
+          btnAutoBright.classList.remove('active');
+          btnAutoBright.innerText = 'Auto-Brightness: OFF';
+        }
         const val = parseInt(this.value, 10);
         const pct = Math.round((val / 255) * 100);
         if (brightBadge) brightBadge.innerText = `${val} (${pct}%)`;
         sendBrightnessRequest(val, false);
       });
       brightSlider.addEventListener('change', function() {
+        if (isAutoBrightEnabled && btnAutoBright) {
+          isAutoBrightEnabled = false;
+          btnAutoBright.classList.remove('active');
+          btnAutoBright.innerText = 'Auto-Brightness: OFF';
+        }
         const val = parseInt(this.value, 10);
         const pct = Math.round((val / 255) * 100);
         if (brightBadge) brightBadge.innerText = `${val} (${pct}%)`;
@@ -2049,6 +1985,11 @@ static const char HTML_PAGE[] PROGMEM = R"rawliteral(<!DOCTYPE html>
     const btnResetBright = document.getElementById('btn-reset-brightness');
     if (btnResetBright) {
       btnResetBright.addEventListener('click', function() {
+        if (isAutoBrightEnabled && btnAutoBright) {
+          isAutoBrightEnabled = false;
+          btnAutoBright.classList.remove('active');
+          btnAutoBright.innerText = 'Auto-Brightness: OFF';
+        }
         if (brightSlider) brightSlider.value = 128;
         if (brightBadge) brightBadge.innerText = '128 (50%)';
         sendBrightnessRequest(128, true);
@@ -2280,6 +2221,16 @@ static const char HTML_PAGE[] PROGMEM = R"rawliteral(<!DOCTYPE html>
             const pct = Math.round((data.brightness / 255) * 100);
             if (brightBadge) brightBadge.innerText = `${data.brightness} (${pct}%)`;
           }
+          if (data.auto_brightness !== undefined && btnAutoBright) {
+            isAutoBrightEnabled = !!data.auto_brightness;
+            if (isAutoBrightEnabled) {
+              btnAutoBright.classList.add('active');
+              btnAutoBright.innerText = 'Auto-Brightness: ON';
+            } else {
+              btnAutoBright.classList.remove('active');
+              btnAutoBright.innerText = 'Auto-Brightness: OFF';
+            }
+          }
         }).catch(() => {});
     }
 
@@ -2415,29 +2366,6 @@ static const char HTML_PAGE[] PROGMEM = R"rawliteral(<!DOCTYPE html>
         });
       });
     }
-  
-    // Interactive Gaze Steering via Viewport Canvas
-    const viewportBox = document.getElementById('viewport-box');
-    function sendGazeTarget(e) {
-      if (!viewportBox) return;
-      const rect = viewportBox.getBoundingClientRect();
-      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-      const normX = ((clientX - rect.left) / rect.width) * 2.0 - 1.0;
-      const normY = ((clientY - rect.top) / rect.height) * 2.0 - 1.0;
-      fetch('/set_gaze', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ x: Math.max(-1, Math.min(1, normX)), y: Math.max(-1, Math.min(1, normY)), duration_ms: 3500 })
-      }).catch(err => console.error(err));
-    }
-    let isPointerDown = false;
-    viewportBox.addEventListener('mousedown', (e) => { isPointerDown = true; sendGazeTarget(e); });
-    window.addEventListener('mousemove', (e) => { if (isPointerDown) sendGazeTarget(e); });
-    window.addEventListener('mouseup', () => { isPointerDown = false; });
-    viewportBox.addEventListener('touchstart', (e) => { isPointerDown = true; sendGazeTarget(e); }, { passive: true });
-    viewportBox.addEventListener('touchmove', (e) => { if (isPointerDown) sendGazeTarget(e); }, { passive: true });
-    viewportBox.addEventListener('touchend', () => { isPointerDown = false; });
 
 </script>
 </body>

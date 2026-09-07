@@ -275,12 +275,15 @@ static esp_err_t set_brightness_handler(httpd_req_t *req) {
     if (b < 0) b = 0;
     if (b > 255) b = 255;
 
+    setAutoBrightnessLive(false);
+    save_auto_brightness_enabled(false);
     setOledBrightnessLive((uint8_t)b);
     if (strcmp(save_str, "true") == 0 || strcmp(save_str, "1") == 0) {
         save_oled_brightness((uint8_t)b);
     }
 
-    const char* resp = "{\"status\":\"ok\"}";
+    char resp[64];
+    snprintf(resp, sizeof(resp), "{\"status\":\"ok\",\"brightness\":%u,\"auto_brightness\":false}", (unsigned)b);
     httpd_resp_set_type(req, "application/json");
     httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
     return httpd_resp_send(req, resp, strlen(resp));
@@ -309,7 +312,9 @@ static esp_err_t set_auto_brightness_handler(httpd_req_t *req) {
     setAutoBrightnessLive(en);
     save_auto_brightness_enabled(en);
 
-    const char* resp = "{\"status\":\"ok\"}";
+    char resp[64];
+    snprintf(resp, sizeof(resp), "{\"status\":\"ok\",\"auto_brightness\":%s,\"brightness\":%u}",
+             en ? "true" : "false", (unsigned)g_oled_brightness);
     httpd_resp_set_type(req, "application/json");
     httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
     return httpd_resp_send(req, resp, strlen(resp));
@@ -443,7 +448,7 @@ static esp_err_t system_info_handler(httpd_req_t *req) {
         "{\"firmware\":\"1.0.0\",\"compiled\":\"%s %s\",\"chip\":\"%s\",\"cores\":%d,\"cpu_mhz\":%d,"
         "\"heap_free\":%u,\"heap_min\":%u,\"psram_free\":0,\"psram_total\":0,"
         "\"uptime_s\":%lu,\"wifi_rssi\":%d,\"wifi_mode\":\"%s\",\"ip\":\"%s\","
-        "\"camera_present\":false,\"camera_ok\":false,\"stream_clients\":0,\"brightness\":%u,\"auto_brightness\":%s}",
+        "\"brightness\":%u,\"auto_brightness\":%s}",
         __DATE__, __TIME__,
         ESP.getChipModel(), ESP.getChipCores(), ESP.getCpuFreqMHz(),
         (unsigned)esp_get_free_heap_size(), (unsigned)esp_get_minimum_free_heap_size(),

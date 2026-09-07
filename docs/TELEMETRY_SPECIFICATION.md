@@ -112,22 +112,18 @@ LoRe hosts a lightweight, asynchronous dual-port HTTP server on the ESP32-S3:
   "wifi_rssi": -52,
   "wifi_mode": "STA",
   "ip": "192.168.1.100",
-  "camera_ok": false, "camera_present": false,
-  "stream_clients": 1
+  "brightness": 128,
+  "auto_brightness": true
 }
 ```
 
-### 2.8 Camera Sensor Control
-- **`POST /set_gaze`:** Adjusts camera sensor parameters dynamically without re-flashing.
-  - **Body:** `{"param": "brightness", "val": 1}`
-  - **Supported Params:**
-    - `brightness` (-2 to +2)
-    - `contrast` (-2 to +2)
-    - `saturation` (-2 to +2)
-    - `vflip` (0 or 1)
-    - `hmirror` (0 or 1)
-    - `aec` (0: manual, 1: auto exposure)
-    - `agc` (0: manual, 1: auto gain)
+### 2.8 Autonomous Gaze Control
+- **`POST /set_gaze`:** Directs LoRe's attention and eye gaze toward normalized virtual coordinates in real time.
+  - **Body:** `{"x": 0.35, "y": -0.20, "duration_ms": 3500}`
+  - **Parameters:**
+    - `x` (float): Horizontal normalized gaze position [-1.0 (left) .. +1.0 (right)]
+    - `y` (float): Vertical normalized gaze position [-1.0 (up) .. +1.0 (down)]
+    - `duration_ms` (float, optional): Attention hold duration in milliseconds (default: 3000 ms)
   - **Response:** `{"status": "ok"}`
 
 ### 2.9 Web Over-The-Air (OTA) Update
@@ -171,8 +167,8 @@ The `/telemetry` and BLE telemetry payloads include dynamic system, affective, a
 - `curiosity`, `social`, `boredom`, `fatigue`, `mischief` (float): Homeostatic drive states [0.0, 1.0]
 - `thought` (string): Real-time cognitive inner thought summary
 - `bonding` (float): Bonding level with human companion [0.0, 1.0]
-- `cam_sleep` (bool): True if camera hardware is in low-power standby mode (telemetry continues to function without forcing camera active)
-- `cam_online` (bool): True if camera sensor hardware initialized successfully
+- `cam_sleep` (bool): Low-power standby sleep status flag (legacy companion schema compatibility)
+- `cam_online` (bool): Legacy hardware status flag (always false in camera-less LoRe architecture)
 - `heap_free` (uint): Free internal heap in bytes
 - `psram_free` (uint): Free PSRAM in bytes
 - `uptime_s` (uint): System uptime in seconds
@@ -189,14 +185,14 @@ LoRe exposes a high-throughput Nordic UART Service (NUS) over BLE GATT for mobil
 
 ### 3.1 On-Demand Telemetry Snapshot
 - **Command:** `{"cmd": "get_telemetry"}` or `{"cmd": "telemetry"}` or raw string `TELEMETRY`
-- **Behavior:** Returns the full JSON telemetry payload via TX notification chunked into safe MTU packets without waking up or forcing the camera sensor ON.
+- **Behavior:** Returns the full JSON telemetry payload via TX notification chunked into safe MTU packets without waking the robot from low-power standby sleep.
 
 ### 3.2 Continuous Telemetry Streaming
 - **Start Streaming:** `{"cmd": "stream_telemetry", "enable": true, "interval": 500}` or `STREAM_TELEMETRY:500`
 - **Stop Streaming:** `{"cmd": "stream_telemetry", "enable": false}` or `STREAM_TELEMETRY:0`
 - **Behavior:** LoRe's background FreeRTOS BLE telemetry task automatically transmits real-time telemetry updates at the specified period (e.g. 500ms) over GATT notifications.
 
-### 3.3 Camera Decoupling Architecture
-Querying or streaming telemetry via BLE or HTTP `/telemetry` operates strictly passively and **never forces the camera hardware to stay ON or wake from standby sleep**. The camera enters standby sleep (`STATE_SLEEP_RECON`) automatically when not actively tracking or streaming video, preserving battery and reducing heat.
+### 3.3 Low-Power Standby Architecture
+Querying or streaming telemetry via BLE or HTTP `/telemetry` operates strictly passively and **never forces the cognitive engine to wake from low-power standby sleep**. The system enters standby sleep (`STATE_SLEEP_RECON`) automatically when not actively receiving stimulus or interacting, preserving battery and reducing thermal dissipation.
 
 

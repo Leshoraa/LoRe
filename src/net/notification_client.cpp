@@ -231,7 +231,7 @@ void initNotificationClient(void) {
     xTaskCreatePinnedToCore(
         ntfyTask,
         "Ntfy_Client_Task",
-        3584,
+        5120,
         NULL,
         1,
         &s_ntfy_task_handle,
