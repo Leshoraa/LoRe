@@ -47,7 +47,10 @@
 - **Russell Circumplex Affective Engine**: Stochastic Langevin diffusion across valence-arousal emotional state space within a stabilizing quartic potential well.
 - **On-Device TinyML Micro-Brain**: 5 homeostatic drives (*Curiosity*, *Social*, *Boredom*, *Fatigue*, *Mischief*) coupled to Markov action selection and circadian energy cycles.
 - **Episodic Latent Vector Memory**: 32-entry episodic memory bank with cosine similarity resonance and NVS flash persistence.
-- **Ambient Utility Glances**: Non-intrusive elastic popups for Digital Clock, Open-Meteo Weather forecast, Ntfy.sh Phone Notifications, and Turn-by-Turn Navigation HUD.
+- **Hybrid Ambient Utility Glances**: Living mini-ocular companion header paired with Digital Clock, Open-Meteo Weather forecast with alternating astronomical dawn/dusk indicator (`^05:49 v17:51`), Ntfy.sh Phone Notifications with physical startle reaction, and Turn-by-Turn Navigation HUD.
+- **Real Astronomical Sunrise & Sunset Sync**: Daily astronomical ephemeris queried from Open-Meteo dynamically anchors dusk wind-down, morning awakening sequence, and ambient display dimming to actual local solar conditions.
+- **OLED Deep Sleep at Night (Anti-Burn-In)**: Automatically powers down the SSD1306 OLED panel (`lcd.sleep()`, 0xAE display off) between 01:00 and 05:30/sunrise, eliminating pixel burn-in and dark room glare. Instantly wakes with physical startle reaction for notifications or touch interactions.
+- **Weather-Aware Affective Kinetics**: Ambient rain/heat responsive Langevin emotional modulation and contemplative upward skyward gaze saccades during rainfall.
 - **Responsive Bento Grid Web UI**: Embedded Single Page Application on Port 80 for remote gaze steering, live telemetry visualization, expression control, and Web OTA updates.
 - **Dual-Band Connectivity**: BLE Nordic UART Service (NUS) for companion phone synchronization and Wi-Fi STA with automatic SoftAP captive portal fallback (192.168.18.16).
 - **Internal SRAM Footprint**: Operates entirely within ~56.9 KB of dynamic memory (17% of internal SRAM) with PSRAM completely disabled.

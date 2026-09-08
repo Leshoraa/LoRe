@@ -116,6 +116,11 @@ typedef struct {
     char condition[24];
     bool valid;
     uint32_t last_sync_ms;
+    uint8_t sunrise_hour;
+    uint8_t sunrise_min;
+    uint8_t sunset_hour;
+    uint8_t sunset_min;
+    bool sun_times_valid;
 } WeatherInfo;
 
 /**

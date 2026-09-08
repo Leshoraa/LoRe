@@ -5,6 +5,7 @@
 
 #include "src/ai/personality_engine.h"
 #include "src/config/lore_config.h"
+#include "src/types/lore_types.h"
 #include <math.h>
 #include <Arduino.h>
 #include <esp_random.h>
@@ -27,6 +28,14 @@ static CircadianState s_circadian = {
 };
 
 static uint32_t s_circadian_epoch_ms = 0;
+static bool s_is_sleep_time = false;
+static bool s_is_deep_sleep_time = false;
+static bool s_is_wakeup_time = false;
+static float s_drowsiness = 0.0f;
+static uint8_t s_effective_sunrise_hour = DEFAULT_SUNRISE_HOUR;
+static uint8_t s_effective_sunrise_min = DEFAULT_SUNRISE_MIN;
+static uint8_t s_effective_sunset_hour = DEFAULT_SUNSET_HOUR;
+static uint8_t s_effective_sunset_min = DEFAULT_SUNSET_MIN;
 
 void initPersonalityEngine(void) {
 #ifdef ARDUINO
@@ -61,19 +70,143 @@ void savePersonalityNVS(void) {
 }
 
 void updateCircadianCycle(void) {
-    uint32_t elapsed = millis() - s_circadian_epoch_ms;
-    float phase_raw = fmodf((float)elapsed, (float)CIRCADIAN_CYCLE_PERIOD_MS) / (float)CIRCADIAN_CYCLE_PERIOD_MS;
-    s_circadian.phase_pct = phase_raw * 100.0f;
+    /* Synchronize sun times from weather observation under mutex */
+    portENTER_CRITICAL(&g_weather_mutex);
+    if (g_weather_info.sun_times_valid) {
+        s_effective_sunrise_hour = g_weather_info.sunrise_hour;
+        s_effective_sunrise_min = g_weather_info.sunrise_min;
+        s_effective_sunset_hour = g_weather_info.sunset_hour;
+        s_effective_sunset_min = g_weather_info.sunset_min;
+    } else {
+        s_effective_sunrise_hour = DEFAULT_SUNRISE_HOUR;
+        s_effective_sunrise_min = DEFAULT_SUNRISE_MIN;
+        s_effective_sunset_hour = DEFAULT_SUNSET_HOUR;
+        s_effective_sunset_min = DEFAULT_SUNSET_MIN;
+    }
+    portEXIT_CRITICAL(&g_weather_mutex);
 
-    /* Alertness peaks mid-morning at 37.5% of cycle */
-    float theta = 6.2831853f * (phase_raw - 0.375f);
-    s_circadian.energy_level = constrain(0.65f + 0.35f * cosf(theta), 0.20f, 1.0f);
+    time_t now_sec;
+    time(&now_sec);
+    bool time_synced = (now_sec > 1700000000);
+    float phase_raw = 0.0f;
 
-    float mood_theta = 6.2831853f * (phase_raw - 0.30f);
-    s_circadian.mood_baseline = constrain(0.025f + 0.20f * cosf(mood_theta), -0.20f, 0.25f);
+    if (time_synced) {
+        struct tm timeinfo;
+        localtime_r(&now_sec, &timeinfo);
+        float hour_float = (float)timeinfo.tm_hour + (float)timeinfo.tm_min / 60.0f + (float)timeinfo.tm_sec / 3600.0f;
 
-    float act_theta = 6.2831853f * (phase_raw - 0.30f);
-    s_circadian.activity_drive = constrain(0.55f + 0.40f * cosf(act_theta), 0.10f, 1.0f);
+        /* 24-hour cycle: 0.0 at midnight 00:00, 0.5 at 12:00 noon */
+        phase_raw = hour_float / 24.0f;
+        s_circadian.phase_pct = phase_raw * 100.0f;
+
+        int now_minutes = timeinfo.tm_hour * 60 + timeinfo.tm_min;
+        int sunrise_minutes = (int)s_effective_sunrise_hour * 60 + (int)s_effective_sunrise_min;
+        int sunset_minutes = (int)s_effective_sunset_hour * 60 + (int)s_effective_sunset_min;
+
+        /* Deep sleep interval: 01:00 AM to 05:30 AM (or until sunrise if earlier) */
+        int deep_sleep_start = OLED_DEEP_SLEEP_START_HOUR * 60 + OLED_DEEP_SLEEP_START_MIN;
+        int deep_sleep_end = OLED_DEEP_SLEEP_END_HOUR * 60 + OLED_DEEP_SLEEP_END_MIN;
+        if (sunrise_minutes < deep_sleep_end) {
+            deep_sleep_end = sunrise_minutes;
+        }
+        s_is_deep_sleep_time = (now_minutes >= deep_sleep_start && now_minutes < deep_sleep_end);
+
+        /* Sleep state: 23:00 to sunrise */
+        s_is_sleep_time = (now_minutes >= 23 * 60 || now_minutes < sunrise_minutes);
+
+        /* Wakeup transition: from sunrise until sunrise + 75 minutes */
+        s_is_wakeup_time = (now_minutes >= sunrise_minutes && now_minutes < sunrise_minutes + 75);
+
+        /* Compute natural drowsiness factor [0.0, 1.0] */
+        if (now_minutes >= 23 * 60) {
+            /* Late night ramp: 23:00 to 24:00 */
+            s_drowsiness = 0.70f + 0.25f * ((float)timeinfo.tm_min / 60.0f);
+        } else if (now_minutes < sunrise_minutes) {
+            /* Deep night peaceful sleep */
+            s_drowsiness = 0.95f;
+        } else if (s_is_wakeup_time) {
+            /* Morning awakening: drowsiness decays smoothly from 0.55 down to 0.0 */
+            float wake_progress = (float)(now_minutes - sunrise_minutes) / 75.0f;
+            s_drowsiness = 0.55f * (1.0f - wake_progress);
+        } else if (now_minutes >= sunset_minutes - 30) {
+            /* Evening dusk wind-down: starts 30 min before sunset, rises towards bedtime */
+            int evening_span = (23 * 60) - (sunset_minutes - 30);
+            if (evening_span < 60) evening_span = 60;
+            float evening_progress = (float)(now_minutes - (sunset_minutes - 30)) / (float)evening_span;
+            s_drowsiness = 0.65f * evening_progress;
+        } else {
+            s_drowsiness = 0.0f;
+        }
+
+        /* Diurnal energy curve: Alertness peaks at 14:00 (phase = 0.583), troughs at 03:00 (phase = 0.125) */
+        float theta = 6.2831853f * (phase_raw - 0.583f);
+        float base_energy = 0.60f + 0.40f * cosf(theta);
+        if (s_is_sleep_time) {
+            base_energy = fminf(base_energy, 0.25f);
+        }
+        s_circadian.energy_level = constrain(base_energy, 0.20f, 1.0f);
+
+        float mood_theta = 6.2831853f * (phase_raw - 0.50f);
+        s_circadian.mood_baseline = constrain(0.025f + 0.18f * cosf(mood_theta), -0.20f, 0.25f);
+
+        float act_theta = 6.2831853f * (phase_raw - 0.54f);
+        float base_act = 0.55f + 0.45f * cosf(act_theta);
+        if (s_is_sleep_time) {
+            base_act = fminf(base_act, 0.15f);
+        }
+        s_circadian.activity_drive = constrain(base_act, 0.10f, 1.0f);
+    } else {
+        /* Fallback to relative elapsed time if NTP is not yet synchronized */
+        uint32_t elapsed = millis() - s_circadian_epoch_ms;
+        phase_raw = fmodf((float)elapsed, (float)CIRCADIAN_CYCLE_PERIOD_MS) / (float)CIRCADIAN_CYCLE_PERIOD_MS;
+        s_circadian.phase_pct = phase_raw * 100.0f;
+
+        float theta = 6.2831853f * (phase_raw - 0.375f);
+        s_circadian.energy_level = constrain(0.65f + 0.35f * cosf(theta), 0.20f, 1.0f);
+
+        float mood_theta = 6.2831853f * (phase_raw - 0.30f);
+        s_circadian.mood_baseline = constrain(0.025f + 0.20f * cosf(mood_theta), -0.20f, 0.25f);
+
+        float act_theta = 6.2831853f * (phase_raw - 0.30f);
+        s_circadian.activity_drive = constrain(0.55f + 0.40f * cosf(act_theta), 0.10f, 1.0f);
+
+        s_is_sleep_time = false;
+        s_is_deep_sleep_time = false;
+        s_is_wakeup_time = false;
+        s_drowsiness = 0.0f;
+    }
+}
+
+bool isCircadianSleepTime(void) {
+    return s_is_sleep_time;
+}
+
+bool isCircadianDeepSleepTime(void) {
+    return s_is_deep_sleep_time;
+}
+
+bool isCircadianWakeupTime(void) {
+    return s_is_wakeup_time;
+}
+
+float getCircadianDrowsiness(void) {
+    return s_drowsiness;
+}
+
+uint8_t getEffectiveSunriseHour(void) {
+    return s_effective_sunrise_hour;
+}
+
+uint8_t getEffectiveSunriseMin(void) {
+    return s_effective_sunrise_min;
+}
+
+uint8_t getEffectiveSunsetHour(void) {
+    return s_effective_sunset_hour;
+}
+
+uint8_t getEffectiveSunsetMin(void) {
+    return s_effective_sunset_min;
 }
 
 PersonalityTraits getPersonalityTraits(void) {

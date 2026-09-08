@@ -36,130 +36,105 @@ void renderClockToCanvas(float animFrame, int offsetY) {
         memset(&timeinfo, 0, sizeof(timeinfo));
     }
 
+    char hm_buf[8];
     if (time_synced) {
-        char hm_buf[8];
         bool colon_on = (timeinfo.tm_sec % 2 == 0) || ((int)(animFrame * 2.5f) % 2 == 0);
         snprintf(hm_buf, sizeof(hm_buf), "%02d%c%02d", timeinfo.tm_hour, colon_on ? ':' : ' ', timeinfo.tm_min);
-
-        int time_w = 5 * 18;
-        int time_x = (OLED_PANEL_WIDTH_PX - time_w) / 2;
-        cv.setTextSize(3);
-        cv.setTextColor(TFT_WHITE, TFT_BLACK);
-        cv.setCursor(time_x, 15 + offsetY);
-        cv.print(hm_buf);
     } else {
         bool colon_on = ((int)(animFrame * 2.5f) % 2 == 0);
-        char hm_buf[8];
         snprintf(hm_buf, sizeof(hm_buf), "--%c--", colon_on ? ':' : ' ');
-        int time_w = 5 * 18;
-        int time_x = (OLED_PANEL_WIDTH_PX - time_w) / 2;
-        cv.setTextSize(3);
-        cv.setTextColor(TFT_WHITE, TFT_BLACK);
-        cv.setCursor(time_x, 15 + offsetY);
-        cv.print(hm_buf);
     }
 
-    cv.setTextSize(1);
+    int time_w = 5 * 12; /* Size 2: 12 px per char * 5 = 60 px */
+    int time_x = (OLED_PANEL_WIDTH_PX - time_w) / 2;
+    cv.setTextSize(2);
     cv.setTextColor(TFT_WHITE, TFT_BLACK);
+    cv.setCursor(time_x, 29 + offsetY);
+    cv.print(hm_buf);
 
+    cv.setTextSize(1);
+    char date_str[24];
     if (time_synced) {
         static const char* days[] = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
         static const char* months[] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
-
-        const char* day_str = days[timeinfo.tm_wday % 7];
-        char date_str[16];
-        snprintf(date_str, sizeof(date_str), "%d %s %d",
+        snprintf(date_str, sizeof(date_str), "%s, %d %s",
+            days[timeinfo.tm_wday % 7],
             timeinfo.tm_mday,
-            months[timeinfo.tm_mon % 12],
-            1900 + timeinfo.tm_year
+            months[timeinfo.tm_mon % 12]
         );
-
-        cv.setCursor(6, 50 + offsetY);
-        cv.print(day_str);
-
-        int date_w = strlen(date_str) * 6;
-        int date_x = OLED_PANEL_WIDTH_PX - 6 - date_w;
-        if (date_x < 60) date_x = 60;
-        cv.setCursor(date_x, 50 + offsetY);
-        cv.print(date_str);
     } else {
-        cv.setCursor(6, 50 + offsetY);
-        cv.print("Syncing");
-
-        const char* r_str = "NTP Clock";
-        int rw = strlen(r_str) * 6;
-        cv.setCursor(OLED_PANEL_WIDTH_PX - 6 - rw, 50 + offsetY);
-        cv.print(r_str);
+        snprintf(date_str, sizeof(date_str), "Syncing NTP...");
     }
+    int date_w = strlen(date_str) * 6;
+    int date_x = (OLED_PANEL_WIDTH_PX - date_w) / 2;
+    if (date_x < 0) date_x = 0;
+    cv.setCursor(date_x, 49 + offsetY);
+    cv.print(date_str);
 }
 
 void drawClockScreen(float animFrame) {
     LGFX_Sprite& cv = *s_ambient_canvas;
     cv.fillScreen(TFT_BLACK);
-    renderClockToCanvas(animFrame, get_burn_shift_y());
+    int burn_y = get_burn_shift_y();
+
+    /* Hybrid top zone: Living companion eyes */
+    drawMiniFace(EXPR_IDLE, g_blinkEyeHeight, g_currentOffsetX * 0.35f, g_currentOffsetY * 0.35f, 0.5f);
+    cv.drawFastHLine(6, 25 + burn_y, OLED_PANEL_WIDTH_PX - 12, TFT_WHITE);
+
+    /* Hybrid bottom zone: Digital Clock */
+    renderClockToCanvas(animFrame, burn_y);
     cv.pushSprite(0, 0);
 }
 
 void renderWeatherToCanvas(const WeatherInfo& weather, float animFrame, int offsetY) {
     LGFX_Sprite& cv = *s_ambient_canvas;
-    cv.setTextSize(1);
-    cv.setTextColor(TFT_WHITE, TFT_BLACK);
-
-    char city_buf[24];
-    snprintf(city_buf, sizeof(city_buf), "%s", (weather.city[0] != '\0') ? weather.city : "Weather");
-    int city_w = strlen(city_buf) * 6;
-    int city_x = (OLED_PANEL_WIDTH_PX - city_w) / 2;
-    if (city_x < 0) city_x = 0;
-    cv.setCursor(city_x, 6 + offsetY);
-    cv.print(city_buf);
-
     int code = weather.weather_code;
-    int icx = 34;
-    int icy = 31 + offsetY;
+    int icx = 22;
+    int icy = 42 + offsetY;
 
     if (code == 0 || code == 1) {
-        cv.fillCircle(icx, icy, 6, TFT_WHITE);
+        cv.fillCircle(icx, icy, 5, TFT_WHITE);
         for (int i = 0; i < 6; i++) {
             float angle = (float)i * (2.0f * (float)M_PI / 6.0f) + animFrame * 0.2f;
-            int x1 = icx + (int)roundf(cosf(angle) * 8.0f);
-            int y1 = icy + (int)roundf(sinf(angle) * 8.0f);
-            int x2 = icx + (int)roundf(cosf(angle) * 11.0f);
-            int y2 = icy + (int)roundf(sinf(angle) * 11.0f);
+            int x1 = icx + (int)roundf(cosf(angle) * 7.0f);
+            int y1 = icy + (int)roundf(sinf(angle) * 7.0f);
+            int x2 = icx + (int)roundf(cosf(angle) * 10.0f);
+            int y2 = icy + (int)roundf(sinf(angle) * 10.0f);
             cv.drawLine(x1, y1, x2, y2, TFT_WHITE);
         }
     } else if ((code >= 51 && code <= 67) || (code >= 80 && code <= 82)) {
-        cv.fillCircle(icx - 6, icy - 3, 4, TFT_WHITE);
-        cv.fillCircle(icx, icy - 6, 6, TFT_WHITE);
-        cv.fillCircle(icx + 6, icy - 3, 4, TFT_WHITE);
-        cv.fillRect(icx - 10, icy - 3, 20, 5, TFT_WHITE);
+        cv.fillCircle(icx - 5, icy - 3, 3, TFT_WHITE);
+        cv.fillCircle(icx, icy - 5, 5, TFT_WHITE);
+        cv.fillCircle(icx + 5, icy - 3, 3, TFT_WHITE);
+        cv.fillRect(icx - 8, icy - 3, 16, 4, TFT_WHITE);
 
         int dropShift = ((int)(animFrame * 6.0f)) % 4;
-        for (int r = -6; r <= 6; r += 6) {
+        for (int r = -5; r <= 5; r += 5) {
             int rx = icx + r;
-            int ry = icy + 4 + dropShift;
-            cv.drawLine(rx, ry, rx - 1, ry + 3, TFT_WHITE);
+            int ry = icy + 3 + dropShift;
+            cv.drawLine(rx, ry, rx - 1, ry + 2, TFT_WHITE);
         }
     } else if (code >= 95 && code <= 99) {
-        cv.fillCircle(icx - 6, icy - 4, 4, TFT_WHITE);
-        cv.fillCircle(icx, icy - 7, 6, TFT_WHITE);
-        cv.fillCircle(icx + 6, icy - 4, 4, TFT_WHITE);
-        cv.fillRect(icx - 10, icy - 4, 20, 5, TFT_WHITE);
+        cv.fillCircle(icx - 5, icy - 3, 3, TFT_WHITE);
+        cv.fillCircle(icx, icy - 5, 5, TFT_WHITE);
+        cv.fillCircle(icx + 5, icy - 3, 3, TFT_WHITE);
+        cv.fillRect(icx - 8, icy - 3, 16, 4, TFT_WHITE);
 
-        cv.drawLine(icx, icy + 2, icx - 2, icy + 7, TFT_WHITE);
-        cv.drawLine(icx - 2, icy + 7, icx + 1, icy + 7, TFT_WHITE);
-        cv.drawLine(icx + 1, icy + 7, icx - 1, icy + 12, TFT_WHITE);
+        cv.drawLine(icx, icy + 1, icx - 2, icy + 5, TFT_WHITE);
+        cv.drawLine(icx - 2, icy + 5, icx + 1, icy + 5, TFT_WHITE);
+        cv.drawLine(icx + 1, icy + 5, icx - 1, icy + 9, TFT_WHITE);
     } else if (code == 45 || code == 48) {
-        cv.drawFastHLine(icx - 12, icy - 4, 24, TFT_WHITE);
-        cv.drawFastHLine(icx - 8, icy, 16, TFT_WHITE);
-        cv.drawFastHLine(icx - 12, icy + 4, 24, TFT_WHITE);
+        cv.drawFastHLine(icx - 9, icy - 3, 18, TFT_WHITE);
+        cv.drawFastHLine(icx - 6, icy, 12, TFT_WHITE);
+        cv.drawFastHLine(icx - 9, icy + 3, 18, TFT_WHITE);
     } else {
         if (code == 2) {
-            cv.drawCircle(icx + 7, icy - 7, 3, TFT_WHITE);
+            cv.drawCircle(icx + 6, icy - 6, 2, TFT_WHITE);
         }
-        cv.fillCircle(icx - 6, icy - 2, 5, TFT_WHITE);
-        cv.fillCircle(icx, icy - 6, 7, TFT_WHITE);
-        cv.fillCircle(icx + 6, icy - 2, 5, TFT_WHITE);
-        cv.fillRect(icx - 10, icy - 2, 20, 6, TFT_WHITE);
+        cv.fillCircle(icx - 5, icy - 2, 4, TFT_WHITE);
+        cv.fillCircle(icx, icy - 5, 6, TFT_WHITE);
+        cv.fillCircle(icx + 5, icy - 2, 4, TFT_WHITE);
+        cv.fillRect(icx - 8, icy - 2, 16, 5, TFT_WHITE);
     }
 
     char temp_buf[16];
@@ -170,32 +145,51 @@ void renderWeatherToCanvas(const WeatherInfo& weather, float animFrame, int offs
     }
 
     cv.setTextSize(2);
-    cv.setCursor(62, 24 + offsetY);
+    cv.setTextColor(TFT_WHITE, TFT_BLACK);
+    cv.setCursor(44, 29 + offsetY);
     cv.print(temp_buf);
-    int deg_x = 62 + strlen(temp_buf) * 12;
-    cv.drawCircle(deg_x + 3, 25 + offsetY, 2, TFT_WHITE);
-
+    int deg_x = 44 + strlen(temp_buf) * 12 + 1;
+    cv.drawCircle(deg_x + 2, 30 + offsetY, 1, TFT_WHITE);
     cv.setTextSize(1);
-    char cond_buf[36];
+    cv.setCursor(deg_x + 6, 33 + offsetY);
+    cv.print("C");
+
+    char cond_buf[32];
     if (weather.valid) {
-        snprintf(cond_buf, sizeof(cond_buf), "%s  •  %d%%",
-            weather.condition[0] != '\0' ? weather.condition : "OK",
-            weather.humidity
-        );
+        if (weather.sun_times_valid && ((int)animFrame % 4 >= 2)) {
+            snprintf(cond_buf, sizeof(cond_buf), "^%02d:%02d v%02d:%02d",
+                weather.sunrise_hour, weather.sunrise_min,
+                weather.sunset_hour, weather.sunset_min
+            );
+        } else {
+            snprintf(cond_buf, sizeof(cond_buf), "%s  %d%%",
+                weather.city[0] != '\0' ? weather.city : "Weather",
+                weather.humidity
+            );
+        }
     } else {
-        snprintf(cond_buf, sizeof(cond_buf), "Updating Forecast...");
+        snprintf(cond_buf, sizeof(cond_buf), "Updating...");
     }
-    int cond_w = strlen(cond_buf) * 6;
-    int cond_x = (OLED_PANEL_WIDTH_PX - cond_w) / 2;
-    if (cond_x < 0) cond_x = 0;
-    cv.setCursor(cond_x, 49 + offsetY);
+    cv.setTextSize(1);
+    cv.setCursor(44, 49 + offsetY);
     cv.print(cond_buf);
 }
 
 void drawWeatherScreen(const WeatherInfo& weather, float animFrame) {
     LGFX_Sprite& cv = *s_ambient_canvas;
     cv.fillScreen(TFT_BLACK);
-    renderWeatherToCanvas(weather, animFrame, get_burn_shift_y());
+    int burn_y = get_burn_shift_y();
+
+    /* Hybrid top zone: Living companion eyes reacting to weather */
+    Expression wExpr = EXPR_IDLE;
+    if (weather.valid && weather.weather_code >= 95) {
+        wExpr = EXPR_SHOCK;
+    }
+    drawMiniFace(wExpr, g_blinkEyeHeight, g_currentOffsetX * 0.35f, g_currentOffsetY * 0.35f, 0.5f);
+    cv.drawFastHLine(6, 25 + burn_y, OLED_PANEL_WIDTH_PX - 12, TFT_WHITE);
+
+    /* Hybrid bottom zone: Weather Forecast */
+    renderWeatherToCanvas(weather, animFrame, burn_y);
     cv.pushSprite(0, 0);
 }
 
@@ -205,49 +199,55 @@ void renderNotificationToCanvas(const NotificationInfo& notif, float animFrame, 
     cv.setTextSize(1);
     cv.setTextColor(TFT_WHITE, TFT_BLACK);
 
-    int ix = 6;
-    int iy = 5 + offsetY;
-    cv.drawRect(ix, iy, 11, 8, TFT_WHITE);
-    cv.drawLine(ix, iy, ix + 5, iy + 4, TFT_WHITE);
-    cv.drawLine(ix + 10, iy, ix + 5, iy + 4, TFT_WHITE);
+    /* Mail badge icon */
+    int ix = 8;
+    int iy = 28 + offsetY;
+    cv.drawRect(ix, iy, 9, 7, TFT_WHITE);
+    cv.drawLine(ix, iy, ix + 4, iy + 3, TFT_WHITE);
+    cv.drawLine(ix + 8, iy, ix + 4, iy + 3, TFT_WHITE);
 
-    char header_buf[32];
+    char header_buf[24];
     snprintf(header_buf, sizeof(header_buf), "%s", (notif.title[0] != '\0') ? notif.title : notif.app);
-    cv.setCursor(ix + 15, iy);
+    cv.setCursor(ix + 13, iy);
     cv.print(header_buf);
-
-    cv.drawFastHLine(4, 16 + offsetY, OLED_PANEL_WIDTH_PX - 8, TFT_WHITE);
 
     const char* msg = (notif.message[0] != '\0') ? notif.message : "New alert";
     size_t len = strlen(msg);
 
-    int line_y = 20 + offsetY;
+    int line_y = 39 + offsetY;
     size_t pos = 0;
-    for (int l = 0; l < 3 && pos < len; l++) {
-        char line_buf[24];
-        size_t take = (len - pos > 20) ? 20 : (len - pos);
-        if (take == 20 && pos + take < len && msg[pos + take] != ' ' && msg[pos + take - 1] != ' ') {
+    for (int l = 0; l < 2 && pos < len; l++) {
+        char line_buf[22];
+        size_t take = (len - pos > 19) ? 19 : (len - pos);
+        if (take == 19 && pos + take < len && msg[pos + take] != ' ' && msg[pos + take - 1] != ' ') {
             size_t last_space = 0;
             for (size_t s = 0; s < take; s++) {
                 if (msg[pos + s] == ' ') last_space = s;
             }
-            if (last_space > 6) take = last_space;
+            if (last_space > 5) take = last_space;
         }
         strncpy(line_buf, msg + pos, take);
         line_buf[take] = '\0';
         while (pos + take < len && msg[pos + take] == ' ') take++;
         pos += take;
 
-        cv.setCursor(6, line_y);
+        cv.setCursor(8, line_y);
         cv.print(line_buf);
-        line_y += 11;
+        line_y += 10;
     }
 }
 
 void drawNotificationScreen(const NotificationInfo& notif, float animFrame) {
     LGFX_Sprite& cv = *s_ambient_canvas;
     cv.fillScreen(TFT_BLACK);
-    renderNotificationToCanvas(notif, animFrame, get_burn_shift_y());
+    int burn_y = get_burn_shift_y();
+
+    /* Hybrid top zone: Expressive shocked / alert eyes */
+    drawMiniFace(EXPR_SHOCK, g_blinkEyeHeight, g_currentOffsetX * 0.35f, g_currentOffsetY * 0.35f, 0.5f);
+    cv.drawFastHLine(6, 25 + burn_y, OLED_PANEL_WIDTH_PX - 12, TFT_WHITE);
+
+    /* Hybrid bottom zone: Notification contents */
+    renderNotificationToCanvas(notif, animFrame, burn_y);
     cv.pushSprite(0, 0);
 }
 
@@ -492,9 +492,13 @@ void transitionToAmbient(AmbientScreenMode toMode, float durationMs) {
         } else {
             float p = (t - 0.45f) / 0.55f;
             float bounceT = eval_elastic_bounce_ease(p);
-            int offsetY = (int)roundf((1.0f - bounceT) * 32.0f);
+            int offsetY = (int)roundf((1.0f - bounceT) * 38.0f);
 
             cv.fillScreen(TFT_BLACK);
+            Expression miniExpr = (toMode == AMBIENT_NOTIFICATION) ? EXPR_SHOCK : startExpr;
+            drawMiniFace(miniExpr, 1.0f, g_currentOffsetX * 0.35f, g_currentOffsetY * 0.35f, 0.5f);
+            cv.drawFastHLine(6, 25 + offsetY, OLED_PANEL_WIDTH_PX - 12, TFT_WHITE);
+
             if (toMode == AMBIENT_CLOCK) {
                 renderClockToCanvas(g_animFrame, offsetY);
             } else if (toMode == AMBIENT_WEATHER) {
@@ -546,9 +550,12 @@ void transitionFromAmbientToFace(AmbientScreenMode fromMode, Expression toExpr, 
 
         if (t <= 0.40f) {
             float p = t / 0.40f;
-            int offsetY = (int)roundf((p * p) * 32.0f);
+            int offsetY = (int)roundf((p * p) * 38.0f);
 
             cv.fillScreen(TFT_BLACK);
+            drawMiniFace(toExpr, 1.0f, g_currentOffsetX * 0.35f, g_currentOffsetY * 0.35f, 0.5f);
+            cv.drawFastHLine(6, 25 + offsetY, OLED_PANEL_WIDTH_PX - 12, TFT_WHITE);
+
             if (fromMode == AMBIENT_CLOCK) {
                 renderClockToCanvas(g_animFrame, offsetY);
             } else if (fromMode == AMBIENT_WEATHER) {

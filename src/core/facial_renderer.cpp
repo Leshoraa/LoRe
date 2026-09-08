@@ -455,6 +455,56 @@ void drawFace(Expression expr, float eyeHeightFactor, float offsetX, float offse
     }
 }
 
+void drawMiniFace(Expression expr, float eyeHeightFactor, float offsetX, float offsetY, float scale) {
+    LGFX_Sprite& cv = *s_canvas_ptr;
+
+    int ox = (int)roundf(offsetX);
+    int oy = (int)roundf(offsetY);
+
+    /* Centered dual mini-eyes in top band y = 0..24 */
+    int lx = 44 + ox;
+    int rx = 84 + ox;
+    int ly = 13 + oy;
+    int ry = 13 + oy;
+
+    float normScale = scale / 0.5f;
+    int maxEyeWidth = (int)roundf(14.0f * normScale);
+    int maxEyeHeight = (int)roundf(18.0f * normScale);
+
+    int leftHeight = (int)roundf((float)maxEyeHeight * eyeHeightFactor);
+    int rightHeight = (int)roundf((float)maxEyeHeight * eyeHeightFactor);
+
+    if (expr == EXPR_JOY) {
+        int ew = (int)roundf(5.0f * normScale);
+        int eh = (int)roundf(4.0f * normScale);
+        cv.drawLine(lx - ew, ly, lx, ly - eh, TFT_WHITE);
+        cv.drawLine(lx, ly - eh, lx + ew, ly, TFT_WHITE);
+        cv.drawLine(rx - ew, ry, rx, ry - eh, TFT_WHITE);
+        cv.drawLine(rx, ry - eh, rx + ew, ry, TFT_WHITE);
+    } else if (expr == EXPR_SHOCK) {
+        int r = (int)roundf(6.0f * normScale);
+        cv.drawCircle(lx, ly, r, TFT_WHITE);
+        cv.fillCircle(lx, ly, 2, TFT_WHITE);
+        cv.drawCircle(rx, ry, r, TFT_WHITE);
+        cv.fillCircle(rx, ry, 2, TFT_WHITE);
+    } else {
+        /* IDLE, DEADPAN, and standard blinking */
+        if (leftHeight <= 2) {
+            cv.fillRoundRect(lx - maxEyeWidth / 2, ly - 1, maxEyeWidth, 2, 1, TFT_WHITE);
+        } else {
+            int rad = (leftHeight < 8) ? leftHeight / 2 : 4;
+            cv.fillRoundRect(lx - maxEyeWidth / 2, ly - leftHeight / 2, maxEyeWidth, leftHeight, rad, TFT_WHITE);
+        }
+
+        if (rightHeight <= 2) {
+            cv.fillRoundRect(rx - maxEyeWidth / 2, ry - 1, maxEyeWidth, 2, 1, TFT_WHITE);
+        } else {
+            int rad = (rightHeight < 8) ? rightHeight / 2 : 4;
+            cv.fillRoundRect(rx - maxEyeWidth / 2, ry - rightHeight / 2, maxEyeWidth, rightHeight, rad, TFT_WHITE);
+        }
+    }
+}
+
 void transitionExpression(Expression fromExpr, Expression toExpr, float durationMs) {
     if (fromExpr == toExpr) return;
     LGFX_Sprite& cv = *s_canvas_ptr;

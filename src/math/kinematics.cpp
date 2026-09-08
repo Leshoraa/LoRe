@@ -366,9 +366,26 @@ void updateGazeSystem(void) {
             s_gazeStartTime = now;
             s_inSaccade = true;
         } else {
-            /* Organic idle saccade distribution */
+            /* Weather and circadian context modulation */
+            WeatherInfo local_weather;
+            portENTER_CRITICAL(&g_weather_mutex);
+            local_weather = g_weather_info;
+            portEXIT_CRITICAL(&g_weather_mutex);
+
+            bool is_rain = local_weather.valid && ((local_weather.weather_code >= 51 && local_weather.weather_code <= 67) ||
+                                                   (local_weather.weather_code >= 80 && local_weather.weather_code <= 82) ||
+                                                   (local_weather.weather_code >= 95 && local_weather.weather_code <= 99));
+
+            if (isCircadianSleepTime()) {
+                y_bias += 2.5f; /* Resting downward ocular bias during sleep */
+            }
+
             uint32_t pick = esp_random() % 100;
-            if (pick < 60) {
+            if (is_rain && (pick < 26)) {
+                /* Gaze gently upward toward sky/ceiling when raining */
+                s_targetOffsetX = ((float)(esp_random() % 40) - 20.0f) * 0.1f;
+                s_targetOffsetY = -5.0f - (float)(esp_random() % 35) * 0.1f;
+            } else if (pick < 60) {
                 s_targetOffsetX = ((float)(esp_random() % 70) - 35.0f) * 0.1f;
                 s_targetOffsetY = ((float)(esp_random() % 40) - 20.0f) * 0.1f + y_bias * 0.5f;
             } else if (pick < 88) {
@@ -388,6 +405,9 @@ void updateGazeSystem(void) {
                              (s_targetOffsetY - s_startOffsetY) * (s_targetOffsetY - s_startOffsetY));
             s_gazeDuration = compute_saccade_duration_ms(ds);
             float interval_scale = getPersonalityIdleIntervalScale();
+            if (isCircadianSleepTime()) {
+                interval_scale *= 2.2f; /* Drowsy, slow-spaced saccades at night */
+            }
             s_nextGazeTime = now + s_gazeDuration + (uint32_t)(interval_scale * (float)(esp_random() % 2500 + 3200));
             s_gazeStartTime = now;
             s_inSaccade = true;

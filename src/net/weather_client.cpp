@@ -49,7 +49,30 @@ static void mapWmoCodeToCondition(int code, char* out_str, size_t max_len) {
     out_str[max_len - 1] = '\0';
 }
 
-static bool parseOpenMeteoJson(const String& payload, float* out_temp, int* out_humidity, int* out_code) {
+static bool parseIsoHourMinute(const String& payload, const char* key, uint8_t* out_hour, uint8_t* out_min) {
+    int key_idx = payload.indexOf(key);
+    if (key_idx < 0) return false;
+
+    /* Search for ISO timestamp delimiter 'T' following key, e.g. "2026-09-08T05:49" */
+    int t_idx = payload.indexOf('T', key_idx);
+    if (t_idx < 0 || t_idx > key_idx + 40) return false;
+
+    if ((int)payload.length() < t_idx + 6) return false;
+
+    int hour = payload.substring(t_idx + 1, t_idx + 3).toInt();
+    int min  = payload.substring(t_idx + 4, t_idx + 6).toInt();
+
+    if (hour >= 0 && hour <= 23 && min >= 0 && min <= 59) {
+        *out_hour = (uint8_t)hour;
+        *out_min = (uint8_t)min;
+        return true;
+    }
+    return false;
+}
+
+static bool parseOpenMeteoJson(const String& payload, float* out_temp, int* out_humidity, int* out_code,
+                               uint8_t* out_sunrise_h, uint8_t* out_sunrise_m,
+                               uint8_t* out_sunset_h, uint8_t* out_sunset_m, bool* out_sun_valid) {
     int cur_idx = payload.indexOf("\"current\":");
     if (cur_idx < 0) cur_idx = 0;
 
@@ -77,6 +100,11 @@ static bool parseOpenMeteoJson(const String& payload, float* out_temp, int* out_
     if (code_end < 0) return false;
     *out_code = payload.substring(code_idx, code_end).toInt();
 
+    /* Parse daily astronomical ephemeris */
+    bool sunrise_ok = parseIsoHourMinute(payload, "\"sunrise\"", out_sunrise_h, out_sunrise_m);
+    bool sunset_ok = parseIsoHourMinute(payload, "\"sunset\"", out_sunset_h, out_sunset_m);
+    *out_sun_valid = (sunrise_ok && sunset_ok);
+
     return true;
 }
 
@@ -88,7 +116,7 @@ bool fetchWeatherSync(const char* city, float lat, float lon) {
     HTTPClient http;
     char url[256];
     snprintf(url, sizeof(url),
-        "http://api.open-meteo.com/v1/forecast?latitude=%.4f&longitude=%.4f&current=temperature_2m,relative_humidity_2m,weather_code",
+        "http://api.open-meteo.com/v1/forecast?latitude=%.4f&longitude=%.4f&current=temperature_2m,relative_humidity_2m,weather_code&daily=sunrise,sunset&timezone=auto",
         lat, lon
     );
 
@@ -109,8 +137,13 @@ bool fetchWeatherSync(const char* city, float lat, float lon) {
     float temp = 0.0f;
     int humidity = 0;
     int code = 0;
+    uint8_t sunrise_h = DEFAULT_SUNRISE_HOUR;
+    uint8_t sunrise_m = DEFAULT_SUNRISE_MIN;
+    uint8_t sunset_h = DEFAULT_SUNSET_HOUR;
+    uint8_t sunset_m = DEFAULT_SUNSET_MIN;
+    bool sun_valid = false;
 
-    if (!parseOpenMeteoJson(payload, &temp, &humidity, &code)) {
+    if (!parseOpenMeteoJson(payload, &temp, &humidity, &code, &sunrise_h, &sunrise_m, &sunset_h, &sunset_m, &sun_valid)) {
         return false;
     }
 
@@ -121,6 +154,13 @@ bool fetchWeatherSync(const char* city, float lat, float lon) {
     strncpy(g_weather_info.city, city ? city : WEATHER_DEFAULT_CITY, sizeof(g_weather_info.city) - 1);
     g_weather_info.city[sizeof(g_weather_info.city) - 1] = '\0';
     mapWmoCodeToCondition(code, g_weather_info.condition, sizeof(g_weather_info.condition));
+    if (sun_valid) {
+        g_weather_info.sunrise_hour = sunrise_h;
+        g_weather_info.sunrise_min = sunrise_m;
+        g_weather_info.sunset_hour = sunset_h;
+        g_weather_info.sunset_min = sunset_m;
+        g_weather_info.sun_times_valid = true;
+    }
     g_weather_info.valid = true;
     g_weather_info.last_sync_ms = millis();
     portEXIT_CRITICAL(&g_weather_mutex);

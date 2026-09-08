@@ -59,10 +59,24 @@ extern "C" {
 #define OLED_PANEL_HEIGHT_PX            64
 #define OLED_DEFAULT_BRIGHTNESS         128
 #define DEFAULT_AUTO_BRIGHTNESS         false
-#define NIGHT_HOUR_START                18       /* 18:00 (6 PM) starts night dimming curve */
-#define NIGHT_HOUR_END                  6        /* 06:00 (6 AM) ends night dimming curve */
+#define NIGHT_HOUR_START                18       /* 18:00 (6 PM) fallback night dimming curve */
+#define NIGHT_HOUR_END                  6        /* 06:00 (6 AM) fallback night dimming curve */
 #define OLED_BURN_SHIFT_INTERVAL_MS     35000    /* 35 seconds periodic anti-burn pixel orbit shift */
 #define MANUAL_EXPR_TIMEOUT_MS          60000    /* 60 seconds auto-revert timeout for manual expressions */
+
+/* OLED Deep Sleep Anti-Burn-In & Dark Night Window */
+#define OLED_DEEP_SLEEP_DEFAULT_ENABLED true
+#define OLED_DEEP_SLEEP_START_HOUR      1        /* 01:00 (1 AM) */
+#define OLED_DEEP_SLEEP_START_MIN       0
+#define OLED_DEEP_SLEEP_END_HOUR        5        /* 05:30 (5:30 AM) default wake time */
+#define OLED_DEEP_SLEEP_END_MIN         30
+#define OLED_DEEP_SLEEP_WAKE_TIMEOUT_MS 15000    /* 15s momentary wake on touch/interaction */
+
+/* Astronomical Sun Defaults (Fallback if offline or un-synced) */
+#define DEFAULT_SUNRISE_HOUR            6
+#define DEFAULT_SUNRISE_MIN             0
+#define DEFAULT_SUNSET_HOUR             18
+#define DEFAULT_SUNSET_MIN              0
 
 /* Default Station (STA) Credentials (overridden by env.h) */
 #ifndef WIFI_STA_DEFAULT_SSID

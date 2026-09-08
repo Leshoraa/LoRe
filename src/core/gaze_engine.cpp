@@ -17,7 +17,7 @@ TrackTarget g_current_target;
 ObjectCandidate g_object_candidates[MAX_OBJECT_CANDIDATES];
 int g_num_candidates = 0;
 int g_inspected_candidate_idx = 0;
-volatile ReconState g_recon_state = STATE_ACTIVE;
+volatile ReconState g_recon_state = STATE_SLEEP_RECON;
 volatile float g_fps_ai = 60.0f;
 volatile uint32_t g_last_web_activity_ms = 0;
 volatile uint8_t g_oled_brightness = OLED_DEFAULT_BRIGHTNESS;
@@ -67,6 +67,11 @@ void initGazeEngine(void) {
     g_weather_info.city[0] = '\0';
     g_weather_info.condition[0] = '\0';
     g_weather_info.last_sync_ms = 0;
+    g_weather_info.sunrise_hour = DEFAULT_SUNRISE_HOUR;
+    g_weather_info.sunrise_min = DEFAULT_SUNRISE_MIN;
+    g_weather_info.sunset_hour = DEFAULT_SUNSET_HOUR;
+    g_weather_info.sunset_min = DEFAULT_SUNSET_MIN;
+    g_weather_info.sun_times_valid = false;
 
     g_notification_info.active = false;
     g_notification_info.title[0] = '\0';
@@ -85,8 +90,9 @@ void initGazeEngine(void) {
     g_nav_info.total_dist[0] = '\0';
     g_nav_info.updated_ms = 0;
 
-    s_last_active_activity_ms = millis();
-    LORE_LOG_INF("GAZE", "Autonomous gaze engine initialized");
+    s_last_active_activity_ms = 0;
+    setCpuFrequencyMhz(CPU_FREQ_SLEEP_MHZ);
+    LORE_LOG_INF("GAZE", "Autonomous gaze engine initialized in SLEEP_RECON mode");
 }
 
 void setVirtualTarget(float normX, float normY, float duration_ms) {
@@ -107,7 +113,10 @@ void setVirtualTarget(float normX, float normY, float duration_ms) {
 
     s_virtual_target_until_ms = now + (uint32_t)duration_ms;
     s_last_active_activity_ms = now;
-    g_recon_state = STATE_ACTIVE;
+    if (g_recon_state != STATE_ACTIVE) {
+        setCpuFrequencyMhz(CPU_FREQ_ACTIVE_MHZ);
+        g_recon_state = STATE_ACTIVE;
+    }
 }
 
 void gazeTask(void *pvParameters) {
@@ -125,25 +134,25 @@ void gazeTask(void *pvParameters) {
             g_current_target.confidence = 0.0f;
             g_current_target.human_likelihood = 0.0f;
             portEXIT_CRITICAL(&g_target_mutex);
-        }
 
-        /* Power state management (Dynamic Frequency Scaling) */
-        if (g_recon_state == STATE_ACTIVE) {
-            if (now - s_last_active_activity_ms > ACTIVE_STATE_TIMEOUT_MS) {
+            if (g_recon_state == STATE_ACTIVE) {
                 g_recon_state = STATE_SLEEP_RECON;
                 setCpuFrequencyMhz(CPU_FREQ_SLEEP_MHZ);
             }
-        } else if (g_recon_state == STATE_SLEEP_RECON) {
-            /* Spontaneous wake-up pulse to maintain biological liveliness */
-            static uint32_t s_next_spontaneous_wake_ms = 0;
-            if (s_next_spontaneous_wake_ms == 0) {
-                s_next_spontaneous_wake_ms = now + 45000;
-            }
-            if (now >= s_next_spontaneous_wake_ms) {
-                setCpuFrequencyMhz(CPU_FREQ_ACTIVE_MHZ);
-                g_recon_state = STATE_ACTIVE;
-                s_last_active_activity_ms = now;
-                s_next_spontaneous_wake_ms = now + (esp_random() % 60000 + 40000);
+        }
+
+        /* Active state is strictly allowed ONLY while a manual web gaze target is active */
+        if (g_recon_state == STATE_ACTIVE) {
+            if (s_virtual_target_until_ms == 0 || (now - s_last_active_activity_ms > ACTIVE_STATE_TIMEOUT_MS)) {
+                s_virtual_target_until_ms = 0;
+                portENTER_CRITICAL(&g_target_mutex);
+                g_current_target.detected = false;
+                g_current_target.confidence = 0.0f;
+                g_current_target.human_likelihood = 0.0f;
+                portEXIT_CRITICAL(&g_target_mutex);
+
+                g_recon_state = STATE_SLEEP_RECON;
+                setCpuFrequencyMhz(CPU_FREQ_SLEEP_MHZ);
             }
         }
 

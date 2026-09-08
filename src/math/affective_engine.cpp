@@ -136,8 +136,29 @@ void updateBiologicalMoodEngine(void) {
     updateCircadianCycle();
     CircadianState circa = getCircadianState();
 
-    float target_v = 0.05f + circa.mood_baseline;
-    float target_a = 0.12f * circa.energy_level;
+    /* Context-aware weather mood modulation (subtle, natural continuous dynamics) */
+    WeatherInfo local_weather;
+    portENTER_CRITICAL(&g_weather_mutex);
+    local_weather = g_weather_info;
+    portEXIT_CRITICAL(&g_weather_mutex);
+
+    float weather_v_bias = 0.0f;
+    float weather_a_bias = 0.0f;
+    if (local_weather.valid) {
+        int code = local_weather.weather_code;
+        bool is_rain = ((code >= 51 && code <= 67) || (code >= 80 && code <= 82) || (code >= 95 && code <= 99));
+        if (is_rain) {
+            weather_v_bias = -0.04f; /* Mellow / contemplative rain bias */
+            weather_a_bias = -0.03f;
+        } else if (local_weather.temperature >= 33.0f) {
+            weather_v_bias = -0.05f; /* Sultry heat exhaustion bias */
+            weather_a_bias = -0.02f;
+        }
+        /* Clear / mild weather keeps neutral baseline for natural EXPR_IDLE */
+    }
+
+    float target_v = 0.05f + circa.mood_baseline + weather_v_bias;
+    float target_a = (0.12f + weather_a_bias) * circa.energy_level;
 
     if (is_detected) {
         float bonding = getBrainBondingLevel();

@@ -65,6 +65,9 @@ void dismissNavigationDisplay(void);
 void setOledBrightnessLive(uint8_t brightness);
 void setAutoBrightnessLive(bool enabled);
 
+bool isOledPanelSleeping(void);
+void wakeOledFromDeepSleep(uint32_t duration_ms = OLED_DEEP_SLEEP_WAKE_TIMEOUT_MS);
+
 void oledTask(void* pvParameters);
 
 #endif /* LORE_DISPLAY_ENGINE_H */

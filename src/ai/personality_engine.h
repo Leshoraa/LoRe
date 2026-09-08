@@ -30,6 +30,16 @@ void initPersonalityEngine(void);
 void savePersonalityNVS(void);
 void updateCircadianCycle(void);
 
+bool isCircadianSleepTime(void);
+bool isCircadianDeepSleepTime(void);
+bool isCircadianWakeupTime(void);
+float getCircadianDrowsiness(void);
+
+uint8_t getEffectiveSunriseHour(void);
+uint8_t getEffectiveSunriseMin(void);
+uint8_t getEffectiveSunsetHour(void);
+uint8_t getEffectiveSunsetMin(void);
+
 PersonalityTraits getPersonalityTraits(void);
 CircadianState getCircadianState(void);
 

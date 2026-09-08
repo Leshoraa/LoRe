@@ -24,6 +24,7 @@ static bool s_is_weather_enabled = true;
 static int32_t s_timezone_offset_sec = 7 * 3600;
 static uint8_t s_oled_brightness = OLED_DEFAULT_BRIGHTNESS;
 static bool s_is_auto_brightness_enabled = DEFAULT_AUTO_BRIGHTNESS;
+static bool s_is_oled_deep_sleep_enabled = OLED_DEEP_SLEEP_DEFAULT_ENABLED;
 
 extern volatile bool g_auto_brightness_enabled;
 
@@ -86,6 +87,8 @@ void init_device_config(void) {
 
     s_is_auto_brightness_enabled = prefs.getBool("auto_bright", DEFAULT_AUTO_BRIGHTNESS);
     g_auto_brightness_enabled = s_is_auto_brightness_enabled;
+
+    s_is_oled_deep_sleep_enabled = prefs.getBool("oled_sleep", OLED_DEEP_SLEEP_DEFAULT_ENABLED);
 
     String stored_city = prefs.getString("w_city", WEATHER_DEFAULT_CITY);
     strncpy(s_weather_city, stored_city.c_str(), sizeof(s_weather_city) - 1);
@@ -167,6 +170,18 @@ void save_auto_brightness_enabled(bool is_enabled) {
     prefs.end();
     s_is_auto_brightness_enabled = is_enabled;
     g_auto_brightness_enabled = is_enabled;
+}
+
+bool is_oled_deep_sleep_enabled(void) {
+    return s_is_oled_deep_sleep_enabled;
+}
+
+void save_oled_deep_sleep_enabled(bool is_enabled) {
+    Preferences prefs;
+    prefs.begin("lore_cfg", false);
+    prefs.putBool("oled_sleep", is_enabled);
+    prefs.end();
+    s_is_oled_deep_sleep_enabled = is_enabled;
 }
 
 const char* get_weather_city(void) {

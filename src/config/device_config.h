@@ -31,6 +31,8 @@ uint8_t get_saved_oled_brightness(void);
 void save_oled_brightness(uint8_t brightness);
 bool is_auto_brightness_enabled(void);
 void save_auto_brightness_enabled(bool is_enabled);
+bool is_oled_deep_sleep_enabled(void);
+void save_oled_deep_sleep_enabled(bool is_enabled);
 
 const char* get_weather_city(void);
 float get_weather_lat(void);

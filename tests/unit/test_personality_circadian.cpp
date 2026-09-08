@@ -129,6 +129,70 @@ int main() {
     assert(scale_active < scale_stoic); // Active/playful checks clock/weather more frequently (shorter interval)
     std::cout << "[PASS] Ambient glance frequency scaling verified." << std::endl;
 
+    // Test 6: Astronomical Sunrise / Sunset & Circadian Rhythm Alignment
+    uint8_t sunrise_h = 5, sunrise_m = 49;  // 05:49 AM
+    uint8_t sunset_h = 17, sunset_m = 51;  // 17:51 PM
+    int sunrise_min = sunrise_h * 60 + sunrise_m; // 349 min
+    int sunset_min = sunset_h * 60 + sunset_m;   // 1071 min
+
+    auto eval24h = [&](int hour, int min, bool& out_sleep, bool& out_deep_sleep, bool& out_wake, float& out_drowsy) {
+        int now_min = hour * 60 + min;
+        int deep_start = 1 * 60 + 0;   // 01:00
+        int deep_end = 5 * 60 + 30;    // 05:30
+        if (sunrise_min < deep_end) deep_end = sunrise_min;
+
+        out_deep_sleep = (now_min >= deep_start && now_min < deep_end);
+        out_sleep = (now_min >= 23 * 60 || now_min < sunrise_min);
+        out_wake = (now_min >= sunrise_min && now_min < sunrise_min + 75);
+
+        if (now_min >= 23 * 60) {
+            out_drowsy = 0.70f + 0.25f * ((float)min / 60.0f);
+        } else if (now_min < sunrise_min) {
+            out_drowsy = 0.95f;
+        } else if (out_wake) {
+            float progress = (float)(now_min - sunrise_min) / 75.0f;
+            out_drowsy = 0.55f * (1.0f - progress);
+        } else if (now_min >= sunset_min - 30) {
+            int span = (23 * 60) - (sunset_min - 30);
+            float progress = (float)(now_min - (sunset_min - 30)) / (float)span;
+            out_drowsy = 0.65f * progress;
+        } else {
+            out_drowsy = 0.0f;
+        }
+    };
+
+    bool is_sleep, is_deep_sleep, is_wake;
+    float drowsy;
+
+    // Midday (12:00)
+    eval24h(12, 0, is_sleep, is_deep_sleep, is_wake, drowsy);
+    assert(!is_sleep && !is_deep_sleep && !is_wake && drowsy == 0.0f);
+
+    // Dusk (18:30, after sunset)
+    eval24h(18, 30, is_sleep, is_deep_sleep, is_wake, drowsy);
+    assert(!is_sleep && !is_deep_sleep && !is_wake && drowsy > 0.0f && drowsy < 0.40f);
+
+    // Late night bedtime (23:15)
+    eval24h(23, 15, is_sleep, is_deep_sleep, is_wake, drowsy);
+    assert(is_sleep && !is_deep_sleep && drowsy >= 0.70f);
+
+    // Deep night (02:30, OLED Deep Sleep Window)
+    eval24h(2, 30, is_sleep, is_deep_sleep, is_wake, drowsy);
+    assert(is_sleep && is_deep_sleep && drowsy == 0.95f);
+
+    // Sunrise dawn awakening (05:49)
+    eval24h(5, 49, is_sleep, is_deep_sleep, is_wake, drowsy);
+    assert(!is_sleep && !is_deep_sleep && is_wake && std::abs(drowsy - 0.55f) < 0.01f);
+
+    // Morning wake transition progress (06:20)
+    eval24h(6, 20, is_sleep, is_deep_sleep, is_wake, drowsy);
+    assert(!is_sleep && !is_deep_sleep && is_wake && drowsy < 0.40f && drowsy > 0.10f);
+
+    // Fully awake morning (07:30)
+    eval24h(7, 30, is_sleep, is_deep_sleep, is_wake, drowsy);
+    assert(!is_sleep && !is_deep_sleep && !is_wake && drowsy == 0.0f);
+    std::cout << "[PASS] Astronomical sunrise/sunset circadian & deep sleep validation verified." << std::endl;
+
     std::cout << "[SUCCESS] All Personality and Circadian Rhythm tests passed!" << std::endl;
     return 0;
 }
