@@ -134,6 +134,15 @@ int main() {
     assert(soma_sleepy.upper_lid_right > 0.35f);
     std::cout << "[PASS] Continuous morphing to EXPR_SLEEPY heavy upper lid droop verified." << std::endl;
 
+    /* Verify continuous morphing into EXPR_DIZZY */
+    g_currentExpr = EXPR_DIZZY;
+    for (int i = 0; i < 30; ++i) updateAutonomicEngine(dt);
+    OcularSomaState soma_dizzy = getOcularSomaState();
+    assert(soma_dizzy.left_w > 26.0f && soma_dizzy.left_w < 30.0f);
+    assert(soma_dizzy.left_h > 26.0f && soma_dizzy.left_h < 30.0f);
+    assert(soma_dizzy.left_n > 1.8f && soma_dizzy.left_n < 2.2f);
+    std::cout << "[PASS] Continuous morphing to EXPR_DIZZY circularized spiral geometry verified." << std::endl;
+
     /* Return to baseline EXPR_IDLE */
     g_currentExpr = EXPR_IDLE;
     for (int i = 0; i < 30; ++i) updateAutonomicEngine(dt);

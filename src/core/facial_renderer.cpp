@@ -18,21 +18,13 @@
 
 static LGFX_Sprite* s_canvas_ptr = &canvas;
 
-/* 3D Parallax Cornea Catchlight Constants */
-static const float kParallaxRatio = 0.45f;
-static const float kBaseCatchlightOffsetX = -3.5f;
-static const float kBaseCatchlightOffsetY = -3.5f;
-static const int kCatchlightWidthPx = 2;
-static const int kCatchlightHeightPx = 2;
-static const float kCatchlightMinAperture = 0.38f;
-static const float kCatchlightMaxRadSq = 0.65f;
-
 /* Ambient Micro-Particle Accent System */
 enum ParticleType {
     PARTICLE_NONE = 0,
     PARTICLE_ZZZ,
     PARTICLE_HEART,
-    PARTICLE_SWEAT
+    PARTICLE_SWEAT,
+    PARTICLE_STAR
 };
 
 struct OcularParticle {
@@ -54,6 +46,7 @@ static uint32_t s_lastParticleUpdateTimeUs = 0;
 static const uint32_t kZzzSpawnIntervalMs = 1300;
 static const uint32_t kHeartSpawnIntervalMs = 2200;
 static const uint32_t kSweatSpawnIntervalMs = 1900;
+static const uint32_t kStarSpawnIntervalMs = 1100;
 
 static void spawnParticle(ParticleType type, float x, float y, float vx, float vy, float decay_rate) {
     for (int i = 0; i < kMaxParticles; ++i) {
@@ -146,48 +139,59 @@ static void renderOneEyeSuperellipse(LGFX_Sprite& cv, float xc, float yc, float 
     }
 }
 
-static void renderCorneaCatchlights(LGFX_Sprite& cv, float left_xc, float left_yc, float right_xc, float right_yc,
-                                    float left_a, float left_b, float right_a, float right_b,
-                                    float ox, float oy, float aperture, float stroke_thickness) {
-    if (aperture < kCatchlightMinAperture || stroke_thickness > 0.5f || left_b <= 2.0f || right_b <= 2.0f) {
+static const float kDizzyWobbleAmplitude = 2.5f;
+static const float kDizzyWobbleSpeed = 0.006f;
+static const float kDizzySpiralSpeed = 0.007f;
+static const float kSpiralMinRadius = 1.8f;
+static const float kSpiralRadialMargin = 2.5f;
+static const int kSpiralSteps = 28;
+
+static void renderDizzySpiralEye(LGFX_Sprite& cv, float xc, float yc, float max_r, float aperture, float phase_rad) {
+    if (aperture <= 0.05f || max_r < 3.0f) {
+        int slit_w = (int)roundf(max_r * 2.0f);
+        if (slit_w < 10) slit_w = 10;
+        cv.fillRoundRect((int)roundf(xc - max_r), (int)roundf(yc - 1.0f), slit_w, 2, 1, TFT_WHITE);
         return;
     }
 
-    /* Convex 3D Cornea Parallax Displacement */
-    float delta_glint_x = -(float)ox * (1.0f - kParallaxRatio);
-    float delta_glint_y = -(float)oy * (1.0f - kParallaxRatio);
+    int rx = (int)roundf(max_r);
+    int ry = (int)roundf(max_r * aperture);
+    if (rx < 4) rx = 4;
+    if (ry < 2) ry = 2;
 
-    float glint_lx = left_xc + kBaseCatchlightOffsetX + delta_glint_x;
-    float glint_ly = left_yc + kBaseCatchlightOffsetY + delta_glint_y;
-    float glint_rx = right_xc + kBaseCatchlightOffsetX + delta_glint_x;
-    float glint_ry = right_yc + kBaseCatchlightOffsetY + delta_glint_y;
+    /* Outer elliptical perimeter */
+    cv.drawEllipse((int)roundf(xc), (int)roundf(yc), rx, ry, TFT_WHITE);
 
-    if (g_currentExpr == EXPR_DIZZY) {
-        uint32_t t_ms = millis();
-        float angle = (float)(t_ms % 800) * (2.0f * 3.14159265f / 800.0f);
-        glint_lx += 3.5f * cosf(angle);
-        glint_ly += 3.5f * sinf(angle);
-        glint_rx += 3.5f * cosf(angle + 3.14159265f);
-        glint_ry += 3.5f * sinf(angle + 3.14159265f);
-    }
+    /* Solid pupil core at center */
+    int icx = (int)roundf(xc);
+    int icy = (int)roundf(yc);
+    cv.fillRect(icx - 1, icy - 1, 2, 2, TFT_WHITE);
 
-    int glint_w = (g_currentExpr == EXPR_SLEEPY) ? 1 : kCatchlightWidthPx;
-    int glint_h = (g_currentExpr == EXPR_SLEEPY) ? 1 : kCatchlightHeightPx;
+    /* Archimedean spiral: r(theta) = r_min + (r_max - r_min) * (theta / theta_max) */
+    const float kMaxTheta = 4.0f * 3.14159265f;
+    const float r_max = fmaxf(kSpiralMinRadius + 1.0f, max_r - kSpiralRadialMargin);
+    const float d_theta = kMaxTheta / (float)kSpiralSteps;
 
-    /* Check containment inside left cornea */
-    float dx_l = glint_lx - left_xc;
-    float dy_l = glint_ly - left_yc;
-    float norm_dist_l = (dx_l * dx_l) / (left_a * left_a) + (dy_l * dy_l) / (left_b * left_b);
-    if (norm_dist_l <= kCatchlightMaxRadSq) {
-        cv.fillRect((int)roundf(glint_lx), (int)roundf(glint_ly), glint_w, glint_h, TFT_BLACK);
-    }
+    float prev_x = xc + kSpiralMinRadius * cosf(phase_rad);
+    float prev_y = yc + kSpiralMinRadius * sinf(phase_rad) * aperture;
 
-    /* Check containment inside right cornea */
-    float dx_r = glint_rx - right_xc;
-    float dy_r = glint_ry - right_yc;
-    float norm_dist_r = (dx_r * dx_r) / (right_a * right_a) + (dy_r * dy_r) / (right_b * right_b);
-    if (norm_dist_r <= kCatchlightMaxRadSq) {
-        cv.fillRect((int)roundf(glint_rx), (int)roundf(glint_ry), glint_w, glint_h, TFT_BLACK);
+    for (int i = 1; i <= kSpiralSteps; ++i) {
+        float theta = (float)i * d_theta;
+        float r = kSpiralMinRadius + (r_max - kSpiralMinRadius) * (theta / kMaxTheta);
+        float angle = theta + phase_rad;
+        float curr_x = xc + r * cosf(angle);
+        float curr_y = yc + r * sinf(angle) * aperture;
+
+        int x0 = (int)roundf(prev_x);
+        int y0 = (int)roundf(prev_y);
+        int x1 = (int)roundf(curr_x);
+        int y1 = (int)roundf(curr_y);
+
+        cv.drawLine(x0, y0, x1, y1, TFT_WHITE);
+        cv.drawLine(x0, y0 + 1, x1, y1 + 1, TFT_WHITE);
+
+        prev_x = curr_x;
+        prev_y = curr_y;
     }
 }
 
@@ -231,6 +235,19 @@ static void updateAndRenderParticles(LGFX_Sprite& cv, float left_xc, float left_
             float vx = -0.5f;
             float vy = 4.0f + (float)(esp_random() % 10) * 0.1f;
             spawnParticle(PARTICLE_SWEAT, spawn_x, spawn_y, vx, vy, 0.70f);
+        }
+    } else if (g_currentExpr == EXPR_DIZZY) {
+        if (now - s_lastParticleSpawnTime >= kStarSpawnIntervalMs) {
+            s_lastParticleSpawnTime = now;
+            static bool s_star_side = false;
+            s_star_side = !s_star_side;
+            float base_xc = s_star_side ? left_xc : right_xc;
+            float offset_x = s_star_side ? (-left_a - 3.0f) : (right_a + 3.0f);
+            float spawn_x = base_xc + offset_x + (float)(esp_random() % 5) - 2.0f;
+            float spawn_y = (s_star_side ? left_yc : right_yc) - 8.0f - (float)(esp_random() % 4);
+            float vx = (s_star_side ? -1.5f : 1.5f) + (float)(esp_random() % 10) * 0.1f;
+            float vy = -3.5f - (float)(esp_random() % 10) * 0.1f;
+            spawnParticle(PARTICLE_STAR, spawn_x, spawn_y, vx, vy, 0.55f);
         }
     }
 
@@ -283,6 +300,19 @@ static void updateAndRenderParticles(LGFX_Sprite& cv, float left_xc, float left_
                 }
                 break;
             }
+            case PARTICLE_STAR: {
+                int sx = px + (int)roundf(cosf(p.life * 12.56637f) * 1.5f);
+                int sy = py;
+                if (sx >= 2 && sx <= OLED_PANEL_WIDTH_PX - 3 && sy >= 2 && sy <= OLED_PANEL_HEIGHT_PX - 3) {
+                    cv.drawFastVLine(sx, sy - 2, 5, TFT_WHITE);
+                    cv.drawFastHLine(sx - 2, sy, 5, TFT_WHITE);
+                    if (fmodf(p.life * 10.0f, 2.0f) < 1.0f) {
+                        cv.drawPixel(sx - 1, sy - 1, TFT_WHITE);
+                        cv.drawPixel(sx + 1, sy + 1, TFT_WHITE);
+                    }
+                }
+                break;
+            }
             default:
                 break;
         }
@@ -311,15 +341,26 @@ void drawAutonomousSoma(const OcularSomaState& soma, float offsetX, float offset
     float right_a = soma.right_w * 0.5f;
     float right_b = soma.right_h * 0.5f * aperture;
 
-    renderOneEyeSuperellipse(cv, left_xc, left_yc, left_a, left_b, soma.left_n, soma.tilt_left, soma.stroke_thickness,
-                            soma.brow_tilt_left, soma.cheek_tilt_left, soma.upper_lid_left, soma.lower_lid_left);
-    renderOneEyeSuperellipse(cv, right_xc, right_yc, right_a, right_b, soma.right_n, soma.tilt_right, soma.stroke_thickness,
-                            soma.brow_tilt_right, soma.cheek_tilt_right, soma.upper_lid_right, soma.lower_lid_right);
+    if (g_currentExpr == EXPR_DIZZY) {
+        float t_ms = (float)millis();
+        float wobble_rad = t_ms * kDizzyWobbleSpeed;
+        float phase_l = t_ms * kDizzySpiralSpeed;
+        float phase_r = -t_ms * kDizzySpiralSpeed;
 
-    /* Render 3D Parallax Cornea Catchlights */
-    renderCorneaCatchlights(cv, left_xc, left_yc, right_xc, right_yc,
-                           left_a, left_b, right_a, right_b,
-                           (float)ox, (float)oy, aperture, soma.stroke_thickness);
+        /* Asynchronous out-of-phase orbital wobble to simulate rolling dizzy motion */
+        float wobble_x_l = cosf(wobble_rad) * kDizzyWobbleAmplitude;
+        float wobble_y_l = sinf(wobble_rad) * kDizzyWobbleAmplitude;
+        float wobble_x_r = cosf(wobble_rad + 3.14159265f) * kDizzyWobbleAmplitude;
+        float wobble_y_r = sinf(wobble_rad + 3.14159265f) * kDizzyWobbleAmplitude;
+
+        renderDizzySpiralEye(cv, left_xc + wobble_x_l, left_yc + wobble_y_l, left_a, aperture, phase_l);
+        renderDizzySpiralEye(cv, right_xc + wobble_x_r, right_yc + wobble_y_r, right_a, aperture, phase_r);
+    } else {
+        renderOneEyeSuperellipse(cv, left_xc, left_yc, left_a, left_b, soma.left_n, soma.tilt_left, soma.stroke_thickness,
+                                soma.brow_tilt_left, soma.cheek_tilt_left, soma.upper_lid_left, soma.lower_lid_left);
+        renderOneEyeSuperellipse(cv, right_xc, right_yc, right_a, right_b, soma.right_n, soma.tilt_right, soma.stroke_thickness,
+                                soma.brow_tilt_right, soma.cheek_tilt_right, soma.upper_lid_right, soma.lower_lid_right);
+    }
 
     /* Render subtle expressive accents */
     if (g_currentExpr == EXPR_CRYING && aperture > 0.3f) {
@@ -474,6 +515,19 @@ void drawMiniFace(Expression expr, float eyeHeightFactor, float offsetX, float o
             cv.drawLine(rx - 5, ry + 2, rx, ry - 2, TFT_WHITE);
             cv.drawLine(rx, ry - 2, rx + 5, ry + 2, TFT_WHITE);
         }
+    } else if (expr == EXPR_DIZZY) {
+        /* Compact dizzy swirl mini-eyes for top status band */
+        float t_ms = (float)millis();
+        float phase_l = t_ms * kDizzySpiralSpeed;
+        float phase_r = -t_ms * kDizzySpiralSpeed;
+        cv.drawCircle(lx, ly, 5, TFT_WHITE);
+        cv.drawCircle(rx, ry, 5, TFT_WHITE);
+        int dx_l = (int)roundf(cosf(phase_l) * 3.5f);
+        int dy_l = (int)roundf(sinf(phase_l) * 3.5f);
+        cv.drawLine(lx - dx_l, ly - dy_l, lx + dx_l, ly + dy_l, TFT_WHITE);
+        int dx_r = (int)roundf(cosf(phase_r) * 3.5f);
+        int dy_r = (int)roundf(sinf(phase_r) * 3.5f);
+        cv.drawLine(rx - dx_r, ry - dy_r, rx + dx_r, ry + dy_r, TFT_WHITE);
     } else {
         if (eyeHeightFactor >= 0.99f) {
             /* Compact resting mini-eyes (rounded rectangles) */

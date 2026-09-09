@@ -99,8 +99,8 @@ static const ExpressionMorphTarget kExpressionMorphTable[NUM_EXPRESSIONS] = {
     { 32.0f, 32.0f, 18.0f, 18.0f, 3.0f, 3.0f,  0.00f,  0.00f,  0.00f,  0.00f, 0.0f, 0.0f, 0.42f, 0.42f, 0.15f, 0.15f },
     /* 9: EXPR_COOL - Sunglasses swagger with horizontal top cutoff and relaxed posture */
     { 34.0f, 34.0f, 22.0f, 22.0f, 3.5f, 3.5f,  0.00f,  0.00f,  0.00f,  0.00f, 0.0f, 0.0f, 0.35f, 0.35f, 0.00f, 0.00f },
-    /* 10: EXPR_DIZZY - Disoriented counter-axial torsion with circularized oculi */
-    { 26.0f, 26.0f, 26.0f, 26.0f, 2.0f, 2.0f,  0.45f, -0.45f,  0.00f,  0.00f, 0.0f, 0.0f, 0.10f, 0.10f, 0.10f, 0.10f },
+    /* 10: EXPR_DIZZY - Disoriented hypnotic spiral oculus geometry with relaxed palpebra */
+    { 28.0f, 28.0f, 28.0f, 28.0f, 2.0f, 2.0f,  0.00f,  0.00f,  0.00f,  0.00f, 0.0f, 0.0f, 0.00f, 0.00f, 0.00f, 0.00f },
     /* 11: EXPR_CRYING - Trembling sorrowful outer droop with weeping palpebral constriction */
     { 30.0f, 30.0f, 24.0f, 24.0f, 2.8f, 2.8f,  0.00f,  0.00f, -0.32f,  0.32f, 0.0f, 0.0f, 0.30f, 0.30f, 0.20f, 0.20f }
 };

@@ -265,7 +265,7 @@ The emotional state space is partitioned into 12 canonical expressions:
 8. `EXPR_MISCHIEF`: Playful smirk with slanted brow and squinted lower cheek ($u_{\text{lid}} = 0.15$, $l_{\text{lid}} = 0.25$).
 9. `EXPR_SLEEPY`: Softened, heavy upper lids ($u_{\text{lid}} = 0.42$, $l_{\text{lid}} = 0.15$) drooping over flattened oculi ($h = 18$).
 10. `EXPR_COOL`: Flat horizontal top cutoff ($u_{\text{lid}} = 0.35$, $n = 3.5$) with wide relaxed swagger ($w = 34$).
-11. `EXPR_DIZZY`: Counter-axial ocular torsion ($\theta_{\text{axial}} = \pm 0.45\text{ rad} \approx \pm 26^\circ$) with circularized oculi ($n = 2.0$).
+11. `EXPR_DIZZY`: Disoriented anime swirl eyes (`@_@`) via dual Archimedean spirals rotating in opposite directions with out-of-phase orbital wobble and twinkling cartoon star particles.
 12. `EXPR_CRYING`: Trembling outer droop ($\theta_{\text{brow}} = \mp 0.32\text{ rad}$) with palpebral constriction and animated weeping tear drops.
 
 ### 11.2 Dual-Plane Palpebral Slant Formulation
@@ -291,7 +291,7 @@ Expression policy selection samples from this categorical distribution, ensuring
 
 ---
 
-## 12. Affective Saccade Kinematics, 3D Cornea Parallax, and Ambient Micro-Particles
+## 12. Affective Saccade Kinematics and Ambient Micro-Particles
 
 ### 12.1 Affective Saccade Kinematics & Neuromuscular Tone
 Ballistic and smooth ocular movements dynamically modulate their biomechanical parameters according to the active emotional archetype $E \in [0, 11]$:
@@ -305,20 +305,24 @@ Ballistic and smooth ocular movements dynamically modulate their biomechanical p
   $$\ddot{\mathbf{x}} = (\omega_n \cdot \omega_{\text{mult}}(E))^2 (\mathbf{x}^* - \mathbf{x}) - 2 (\zeta \cdot \zeta_{\text{mult}}(E)) (\omega_n \cdot \omega_{\text{mult}}(E)) \dot{\mathbf{x}}$$
   Stiffness $\omega_n$ escalates during angry confrontation and fear, while damping $\zeta$ reduces during joyful bounce.
 
-### 12.2 3D Convex Cornea Parallax Reflection Model
-To overcome the perceptual flatness of 2D solid white superellipses on monochrome OLED panels, a negative-space corneal specular catchlight ($2 \times 2\text{ px}$, `TFT_BLACK`) is rasterized within the ocular body.
-Under a stationary distant ambient light source, rotating a convex 3D spherical cornea by gaze offset $(ox, oy)$ causes the specular highlight to shift relative to the cornea center with an inverse parallax displacement:
-$$\Delta x_{\text{catchlight}} = -ox \cdot (1.0 - k_{\text{parallax}})$$
-$$\Delta y_{\text{catchlight}} = -oy \cdot (1.0 - k_{\text{parallax}})$$
-where $k_{\text{parallax}} = 0.45$.
-- **Perceived Depth:** In world coordinates, the highlight advances at $+0.45 \cdot ox$ while the eyeball shifts at $+1.0 \cdot ox$, providing unmistakable visual perception of a protruding 3D spherical convex dome.
-- **Palpebral Occlusion:** Highlight rendering is naturally suppressed when palpebral aperture $\le 0.38$, simulating anatomical shielding under the upper tarsal plate.
-
-### 12.3 Zero-Allocation Ambient Micro-Particle Dynamics
+### 12.2 Zero-Allocation Ambient Micro-Particle Dynamics
 Atmospheric emotional particles are simulated through a static 4-slot ring buffer ($\le 128\text{ bytes}$ `.bss` memory, zero dynamic heap allocation):
 $$\mathbf{p}_{t+\Delta t} = \mathbf{p}_t + \mathbf{v} \cdot \Delta t$$
 $$L_{t+\Delta t} = L_t - r_{\text{decay}} \cdot \Delta t$$
 - **`PARTICLE_ZZZ`:** Drifting up-right ($v_x = 3.5, v_y = -5.0$) during sleepiness or Borbély microsleep struggle.
 - **`PARTICLE_HEART`:** Upward floating heart ($5 \times 5\text{ px}$) with sinusoidal horizontal wobble ($\Delta x = 1.5 \sin(2\pi L)$) triggered by high companionship bonding ($> 0.55$) in `EXPR_HAPPY`.
 - **`PARTICLE_SWEAT`:** Downward dripping droplet ($3 \times 4\text{ px}$, $v_y = +4.0$) on temporal brow during suspicion or surprise.
+- **`PARTICLE_STAR`:** Twinkling 4-point cartoon cross star ($5 \times 5\text{ px}$, $v_y = -3.5$) with lateral wobble ($\Delta x = 1.5 \cos(4\pi L)$) and diagonal core flashes during disorientation in `EXPR_DIZZY`.
 - **State Cleanup:** Expression transitions flush all active particles via `clearOcularParticles()` to prevent emotional bleed.
+
+### 12.3 Hypnotic Archimedean Spiral Swirl & Orbital Wobble Kinematics
+For `EXPR_DIZZY`, static circular geometry is replaced by continuous dynamic Archimedean spiral oculi:
+$$r(\theta) = r_{\min} + (r_{\max} - r_{\min}) \cdot \frac{\theta}{\theta_{\max}}, \quad \theta \in [0, 4\pi]$$
+$$\begin{bmatrix} x \\ y \end{bmatrix} = \begin{bmatrix} x_c(t) + r(\theta) \cos(\theta + \phi(t)) \\ y_c(t) + r(\theta) \sin(\theta + \phi(t)) \cdot \text{aperture} \end{bmatrix}$$
+- **Opposing Rotational Phase:**
+  $$\phi_{\text{left}}(t) = +\omega_{\text{spin}} \cdot t, \quad \phi_{\text{right}}(t) = -\omega_{\text{spin}} \cdot t \quad (\omega_{\text{spin}} = 0.007\text{ rad/ms} \approx 67\text{ RPM})$$
+- **Asynchronous Orbital Wobble:**
+  The eye centers follow an out-of-phase elliptical orbit to simulate drunken/rolling ocular vertigo:
+  $$\Delta x_{\text{left}}(t) = A_{\text{wobble}} \cos(\omega_{\text{wobble}} t), \quad \Delta y_{\text{left}}(t) = A_{\text{wobble}} \sin(\omega_{\text{wobble}} t)$$
+  $$\Delta x_{\text{right}}(t) = A_{\text{wobble}} \cos(\omega_{\text{wobble}} t + \pi), \quad \Delta y_{\text{right}}(t) = A_{\text{wobble}} \sin(\omega_{\text{wobble}} t + \pi)$$
+  where $A_{\text{wobble}} = 2.5\text{ px}$ and $\omega_{\text{wobble}} = 0.006\text{ rad/ms}$.

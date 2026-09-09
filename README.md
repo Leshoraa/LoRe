@@ -44,7 +44,6 @@
 
 - **60 FPS Biomechanical Kinematics**: Flash & Hogan 5th-order minimum-jerk saccade trajectory generation coupled with an underdamped second-order ocular mass-spring-damper system ($\omega_n = 32.0\text{ rad/s}, \zeta = 0.72$).
 - **Affective Saccade Kinematics**: Dynamic neuromuscular tone modulation across 12 expressions scaling natural frequency ($\omega_{\text{mult}}$), damping ($\zeta_{\text{mult}}$), ballistic duration ($D_{\text{mult}} \in [0.65\times, 1.60\times]$), and glissadic rebound ($A_{\text{glissade}} \in [0.005, 0.080]$).
-- **3D Parallax Cornea Catchlight**: Specular negative-space highlight ($2 \times 2\text{ px}$, `TFT_BLACK`) moving with an inverse parallax displacement ratio ($k_{\text{parallax}} = 0.45$) relative to the eye center, creating the spatial depth illusion of a convex 3D spherical cornea under an ambient light source.
 - **Zero-Allocation Ambient Micro-Particle Accents**: Static 4-slot ring buffer producing procedural floating "Zzz" runes during sleepiness, floating hearts during high bonding companionship, and sweat drops during suspicion or surprise.
 - **Biological Free Gaze Naturalization Suite**: 6 coupled biomechanical laws eliminating mechanical servo stiffness:
   1. *Lid-Saccade Synkinesis & Fissure Tracking*: Upper eyelid elevation on upward gaze and narrowing on downward gaze (*von Graefe's following law*).

@@ -108,28 +108,7 @@ int main() {
     assert(peak_angry <= 1.005f);
     assert(peak_happy <= kGlissadeMaxOvershoot);
 
-    // Test 3: 3D Parallax Cornea Specular Highlight Coordinates
-    // With kParallaxRatio = 0.45, looking right (ox = +10) must shift the glint
-    // to the left relative to eye center: delta_glint = -ox * (1 - 0.45) = -5.5 px.
-    const float kParallaxRatio = 0.45f;
-    float ox = 10.0f;
-    float delta_glint_x = -ox * (1.0f - kParallaxRatio);
-    assert(std::fabs(delta_glint_x - (-5.5f)) < 1e-4f);
-
-    float eye_xc = 64.0f;
-    float eye_yc = 32.0f;
-    float eye_center_with_gaze = eye_xc + ox; // 74.0
-    float glint_abs_x = eye_center_with_gaze - 3.5f + delta_glint_x; // 74 - 3.5 - 5.5 = 65.0
-    // Glint on screen moves in same direction as gaze, but slower:
-    // Screen displacement = glint_abs_x - (eye_xc - 3.5f) = 65.0 - 60.5 = 4.5 px = +ox * kParallaxRatio
-    assert(std::fabs((glint_abs_x - (eye_xc - 3.5f)) - (ox * kParallaxRatio)) < 1e-4f);
-
-    // Test 4: Palpebral Occlusion Threshold
-    const float kCatchlightMinAperture = 0.38f;
-    assert(0.35f < kCatchlightMinAperture); // Closed/blink occludes glint
-    assert(0.80f >= kCatchlightMinAperture); // Open eye displays glint
-
-    // Test 5: Micro-Particle Ring Buffer Constraints
+    // Test 3: Micro-Particle Ring Buffer Constraints & Zero-Allocation Capacity
     const int kMaxParticles = 4;
     int active_particles = 0;
     for (int i = 0; i < 10; ++i) {
@@ -139,6 +118,12 @@ int main() {
     }
     assert(active_particles == kMaxParticles);
 
-    std::cout << "[PASS] Affective kinematics and 3D parallax unit tests passed." << std::endl;
+    // Test 4: Dynamic Neuromuscular Tone Multipliers for Mass-Spring-Damper
+    // High arousal (ANGRY) stiffens response; low arousal (SAD) softens response.
+    assert(kAffectiveKinematicTable[EXPR_ANGRY].omega_mult > kAffectiveKinematicTable[EXPR_IDLE].omega_mult);
+    assert(kAffectiveKinematicTable[EXPR_SAD].omega_mult < kAffectiveKinematicTable[EXPR_IDLE].omega_mult);
+    assert(kAffectiveKinematicTable[EXPR_HAPPY].zeta_mult < kAffectiveKinematicTable[EXPR_ANGRY].zeta_mult);
+
+    std::cout << "[PASS] Affective kinematics and micro-particle unit tests passed." << std::endl;
     return 0;
 }
