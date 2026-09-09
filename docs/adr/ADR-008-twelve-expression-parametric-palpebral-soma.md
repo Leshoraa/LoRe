@@ -23,7 +23,7 @@ We implemented a fully mathematical, continuous parametric soma architecture sup
    - `EXPR_MISCHIEF` (7): Playful asymmetric smirk with slanted brow and squinted lower lid.
    - `EXPR_SLEEPY` (8): Heavy drowsy upper lids drooping over softened oculi.
    - `EXPR_COOL` (9): Sunglasses swagger with horizontal top cutoff and relaxed posture.
-   - `EXPR_DIZZY` (10): Disoriented counter-axial torsion with circularized oculi.
+   - `EXPR_DIZZY` (10): Disoriented vestibular disturbance with conjugate torsional pendulum and biological tissue conservation (squishy wobbling ovals `\ /`).
    - `EXPR_CRYING` (11): Trembling sorrowful outer droop with weeping palpebral constriction and animated tear accents.
 
 2. **Dual-Plane Palpebral Slant Formulation:**

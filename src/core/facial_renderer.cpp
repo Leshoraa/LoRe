@@ -139,68 +139,9 @@ static void renderOneEyeSuperellipse(LGFX_Sprite& cv, float xc, float yc, float 
     }
 }
 
-static const float kDizzyWobbleAmplitude = 2.0f;
-static const float kDizzyWobbleSpeed = 0.005f;
-static const float kDizzySpiralSpeed = 0.006f;
-static const float kSpiralMinRadius = 1.0f;
-static const float kMaxSpiralTheta = 18.8495559f; /* 6 * pi (3 full rotational coils) */
-static const int kSpiralSteps = 42;
 static const int kBlushRadiusX = 5;
 static const int kBlushRadiusY = 2;
 static const float kBlushVerticalOffset = 3.5f;
-
-/**
- * @brief Renders animated borderless Archimedean spiral swirl eyes (@_@) for EXPR_DIZZY.
- *
- * Implements borderless, multi-coil Archimedean spiral geometry with uniform normal-offset
- * dual-stroke rasterization matching anime cartoon dizzy eyes without enclosing circles.
- *
- * @param cv Destination sprite canvas.
- * @param xc Center X coordinate of the eye.
- * @param yc Center Y coordinate of the eye.
- * @param max_r Maximum radial extent of the spiral oculus.
- * @param aperture Palpebral aperture factor (0.0 = shut, 1.0 = fully open).
- * @param phase_rad Continuous angular rotational phase in radians.
- */
-static void renderDizzySpiralEye(LGFX_Sprite& cv, float xc, float yc, float max_r, float aperture, float phase_rad) {
-    if (aperture <= 0.05f || max_r < 3.0f) {
-        int slit_w = (int)roundf(max_r * 2.0f);
-        if (slit_w < 10) slit_w = 10;
-        cv.fillRoundRect((int)roundf(xc - max_r), (int)roundf(yc - 1.0f), slit_w, 2, 1, TFT_WHITE);
-        return;
-    }
-
-    /* Pure Archimedean spiral without outer enclosing boundary ring */
-    const float r_max = fmaxf(kSpiralMinRadius + 2.0f, max_r);
-    const float d_theta = kMaxSpiralTheta / (float)kSpiralSteps;
-
-    float prev_x = xc + kSpiralMinRadius * cosf(phase_rad);
-    float prev_y = yc + kSpiralMinRadius * sinf(phase_rad) * aperture;
-
-    for (int i = 1; i <= kSpiralSteps; ++i) {
-        float theta = (float)i * d_theta;
-        float r = kSpiralMinRadius + (r_max - kSpiralMinRadius) * (theta / kMaxSpiralTheta);
-        float angle = theta + phase_rad;
-        float curr_x = xc + r * cosf(angle);
-        float curr_y = yc + r * sinf(angle) * aperture;
-
-        int x0 = (int)roundf(prev_x);
-        int y0 = (int)roundf(prev_y);
-        int x1 = (int)roundf(curr_x);
-        int y1 = (int)roundf(curr_y);
-
-        cv.drawLine(x0, y0, x1, y1, TFT_WHITE);
-        /* Uniform normal-offset line rasterization for bold line thickness across all angles */
-        if (fabsf(curr_x - prev_x) > fabsf(curr_y - prev_y)) {
-            cv.drawLine(x0, y0 + 1, x1, y1 + 1, TFT_WHITE);
-        } else {
-            cv.drawLine(x0 + 1, y0, x1 + 1, y1, TFT_WHITE);
-        }
-
-        prev_x = curr_x;
-        prev_y = curr_y;
-    }
-}
 
 static void updateAndRenderParticles(LGFX_Sprite& cv, float left_xc, float left_yc, float right_xc, float right_yc,
                                     float left_a, float left_b, float right_a, float right_b, float aperture) {
@@ -335,42 +276,21 @@ void drawAutonomousSoma(const OcularSomaState& soma, float offsetX, float offset
     float right_a = soma.right_w * 0.5f;
     float right_b = soma.right_h * 0.5f * aperture;
 
-    if (g_currentExpr == EXPR_DIZZY) {
-        float t_ms = (float)millis();
-        float wobble_rad = t_ms * kDizzyWobbleSpeed;
-        float phase_l = t_ms * kDizzySpiralSpeed;
-        float phase_r = -t_ms * kDizzySpiralSpeed;
+    renderOneEyeSuperellipse(cv, left_xc, left_yc, left_a, left_b, soma.left_n, soma.tilt_left, soma.stroke_thickness,
+                            soma.brow_tilt_left, soma.cheek_tilt_left, soma.upper_lid_left, soma.lower_lid_left);
+    renderOneEyeSuperellipse(cv, right_xc, right_yc, right_a, right_b, soma.right_n, soma.tilt_right, soma.stroke_thickness,
+                            soma.brow_tilt_right, soma.cheek_tilt_right, soma.upper_lid_right, soma.lower_lid_right);
 
-        /* Asynchronous out-of-phase orbital wobble to simulate rolling dizzy motion */
-        float wobble_x_l = cosf(wobble_rad) * kDizzyWobbleAmplitude;
-        float wobble_y_l = sinf(wobble_rad) * kDizzyWobbleAmplitude;
-        float wobble_x_r = cosf(wobble_rad + 3.14159265f) * kDizzyWobbleAmplitude;
-        float wobble_y_r = sinf(wobble_rad + 3.14159265f) * kDizzyWobbleAmplitude;
-
-        float final_left_xc = left_xc + wobble_x_l;
-        float final_left_yc = left_yc + wobble_y_l;
-        float final_right_xc = right_xc + wobble_x_r;
-        float final_right_yc = right_yc + wobble_y_r;
-
-        renderDizzySpiralEye(cv, final_left_xc, final_left_yc, left_a, aperture, phase_l);
-        renderDizzySpiralEye(cv, final_right_xc, final_right_yc, right_a, aperture, phase_r);
-
-        /* Distinctive cute anime blush ovals under each dizzy spiral eye */
-        if (aperture > 0.4f) {
-            int blush_y_l = (int)roundf(final_left_yc + left_a + kBlushVerticalOffset);
-            int blush_y_r = (int)roundf(final_right_yc + right_a + kBlushVerticalOffset);
-            if (blush_y_l < OLED_PANEL_HEIGHT_PX - 2) {
-                cv.fillEllipse((int)roundf(final_left_xc), blush_y_l, kBlushRadiusX, kBlushRadiusY, TFT_WHITE);
-            }
-            if (blush_y_r < OLED_PANEL_HEIGHT_PX - 2) {
-                cv.fillEllipse((int)roundf(final_right_xc), blush_y_r, kBlushRadiusX, kBlushRadiusY, TFT_WHITE);
-            }
+    /* Distinctive cute anime blush ovals under each eye during dizzy disorientation */
+    if (g_currentExpr == EXPR_DIZZY && aperture > 0.4f) {
+        int blush_y_l = (int)roundf(left_yc + left_b + kBlushVerticalOffset);
+        int blush_y_r = (int)roundf(right_yc + right_b + kBlushVerticalOffset);
+        if (blush_y_l < OLED_PANEL_HEIGHT_PX - 2) {
+            cv.fillEllipse((int)roundf(left_xc), blush_y_l, kBlushRadiusX, kBlushRadiusY, TFT_WHITE);
         }
-    } else {
-        renderOneEyeSuperellipse(cv, left_xc, left_yc, left_a, left_b, soma.left_n, soma.tilt_left, soma.stroke_thickness,
-                                soma.brow_tilt_left, soma.cheek_tilt_left, soma.upper_lid_left, soma.lower_lid_left);
-        renderOneEyeSuperellipse(cv, right_xc, right_yc, right_a, right_b, soma.right_n, soma.tilt_right, soma.stroke_thickness,
-                                soma.brow_tilt_right, soma.cheek_tilt_right, soma.upper_lid_right, soma.lower_lid_right);
+        if (blush_y_r < OLED_PANEL_HEIGHT_PX - 2) {
+            cv.fillEllipse((int)roundf(right_xc), blush_y_r, kBlushRadiusX, kBlushRadiusY, TFT_WHITE);
+        }
     }
 
     /* Render subtle expressive accents */
@@ -527,37 +447,14 @@ void drawMiniFace(Expression expr, float eyeHeightFactor, float offsetX, float o
             cv.drawLine(rx, ry - 2, rx + 5, ry + 2, TFT_WHITE);
         }
     } else if (expr == EXPR_DIZZY) {
-        /* Compact borderless dizzy swirl mini-eyes for top status band */
-        float t_ms = (float)millis();
-        float phase_l = t_ms * kDizzySpiralSpeed;
-        float phase_r = -t_ms * kDizzySpiralSpeed;
-        const float kMiniMaxTheta = 12.56637f; /* 4 * pi (2 full coils) */
-        const float r_min = 0.8f;
-        const float r_max = 5.0f;
-        const int kMiniSteps = 16;
-        const float d_theta = kMiniMaxTheta / (float)kMiniSteps;
-
-        float prev_lx = (float)lx + r_min * cosf(phase_l);
-        float prev_ly = (float)ly + r_min * sinf(phase_l);
-        float prev_rx = (float)rx + r_min * cosf(phase_r);
-        float prev_ry = (float)ry + r_min * sinf(phase_r);
-
-        for (int i = 1; i <= kMiniSteps; ++i) {
-            float theta = (float)i * d_theta;
-            float r = r_min + (r_max - r_min) * (theta / kMiniMaxTheta);
-            float curr_lx = (float)lx + r * cosf(theta + phase_l);
-            float curr_ly = (float)ly + r * sinf(theta + phase_l);
-            float curr_rx = (float)rx + r * cosf(theta + phase_r);
-            float curr_ry = (float)ry + r * sinf(theta + phase_r);
-
-            cv.drawLine((int)roundf(prev_lx), (int)roundf(prev_ly), (int)roundf(curr_lx), (int)roundf(curr_ly), TFT_WHITE);
-            cv.drawLine((int)roundf(prev_rx), (int)roundf(prev_ry), (int)roundf(curr_rx), (int)roundf(curr_ry), TFT_WHITE);
-
-            prev_lx = curr_lx;
-            prev_ly = curr_ly;
-            prev_rx = curr_rx;
-            prev_ry = curr_ry;
-        }
+        /* Compact tilted squishy mini-eyes (\ /) for top status band */
+        cv.fillRoundRect(lx - 6, ly - 4, 12, 8, 3, TFT_WHITE);
+        cv.fillRoundRect(rx - 6, ly - 4, 12, 8, 3, TFT_WHITE);
+        /* Subtle diagonal splay notch (\ /) to indicate vestibular disorientation */
+        cv.drawPixel(lx - 6, ly - 4, TFT_BLACK);
+        cv.drawPixel(lx + 5, ly + 3, TFT_BLACK);
+        cv.drawPixel(rx - 6, ly + 3, TFT_BLACK);
+        cv.drawPixel(rx + 5, ly - 4, TFT_BLACK);
     } else {
         if (eyeHeightFactor >= 0.99f) {
             /* Compact resting mini-eyes (rounded rectangles) */

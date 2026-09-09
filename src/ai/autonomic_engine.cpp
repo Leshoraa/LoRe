@@ -99,8 +99,8 @@ static const ExpressionMorphTarget kExpressionMorphTable[NUM_EXPRESSIONS] = {
     { 32.0f, 32.0f, 18.0f, 18.0f, 3.0f, 3.0f,  0.00f,  0.00f,  0.00f,  0.00f, 0.0f, 0.0f, 0.42f, 0.42f, 0.15f, 0.15f },
     /* 9: EXPR_COOL - Sunglasses swagger with horizontal top cutoff and relaxed posture */
     { 34.0f, 34.0f, 22.0f, 22.0f, 3.5f, 3.5f,  0.00f,  0.00f,  0.00f,  0.00f, 0.0f, 0.0f, 0.35f, 0.35f, 0.00f, 0.00f },
-    /* 10: EXPR_DIZZY - Disoriented hypnotic spiral oculus geometry with relaxed palpebra */
-    { 28.0f, 28.0f, 28.0f, 28.0f, 2.0f, 2.0f,  0.00f,  0.00f,  0.00f,  0.00f, 0.0f, 0.0f, 0.00f, 0.00f, 0.00f, 0.00f },
+    /* 10: EXPR_DIZZY - Disoriented vestibular tilt and tissue-conserved squishy oculus */
+    { 28.0f, 28.0f, 28.0f, 28.0f, 2.05f, 2.05f,  0.00f,  0.00f,  0.00f,  0.00f, 0.0f, 0.0f, 0.00f, 0.00f, 0.00f, 0.00f },
     /* 11: EXPR_CRYING - Trembling sorrowful outer droop with weeping palpebral constriction */
     { 30.0f, 30.0f, 24.0f, 24.0f, 2.8f, 2.8f,  0.00f,  0.00f, -0.32f,  0.32f, 0.0f, 0.0f, 0.30f, 0.30f, 0.20f, 0.20f }
 };
@@ -320,11 +320,66 @@ void updateAutonomicEngine(float dt_sec) {
     float tilt_l = s_morph_tilt_l + torsion_rad;
     float tilt_r = s_morph_tilt_r + torsion_rad;
 
+    /* Vestibular Disturbance & Biological Tissue Conservation Law for EXPR_DIZZY */
+    static float s_dizzy_intensity = 0.0f;
+    static float s_dizzy_phase = 0.0f;
+    float target_dizzy = (g_currentExpr == EXPR_DIZZY) ? 1.0f : 0.0f;
+    s_dizzy_intensity += (target_dizzy - s_dizzy_intensity) * alpha;
+
+    float dizzy_offset_x_l = 0.0f, dizzy_offset_y_l = 0.0f;
+    float dizzy_offset_x_r = 0.0f, dizzy_offset_y_r = 0.0f;
+
+    if (s_dizzy_intensity > 0.001f) {
+        static const float kDizzyOmega = 4.2f;       /* Harmonic frequency (~0.67 Hz cycle) */
+        static const float kDizzyTiltAmp = 0.28f;     /* Torsional roll amplitude (~16 deg) */
+        static const float kDizzyPhaseLag = 0.12f;    /* Biological neuro-muscular asymmetry lag */
+        static const float kDizzySquashAmp = 0.16f;   /* Incompressible vertical strain (+/- 16%) */
+        static const float kDizzyWobbleAmp = 1.8f;    /* Orbital vertigo wobble radius (px) */
+
+        s_dizzy_phase += kDizzyOmega * dt_sec;
+        if (s_dizzy_phase > 62.831853f) s_dizzy_phase -= 62.831853f;
+
+        /* 1. Bilateral Conjugate Torsional Pendulum:
+         * Alternates smoothly between outward splay (\ /) and inward splay (/ \) */
+        float tilt_dizzy_l = kDizzyTiltAmp * sinf(s_dizzy_phase);
+        float tilt_dizzy_r = -kDizzyTiltAmp * sinf(s_dizzy_phase + kDizzyPhaseLag);
+
+        /* 2. Biological Tissue Conservation (Incompressibility Law: Sx = 1.0 / sqrt(Sy)):
+         * As one eye squashes vertically, it bulges horizontally, conserving ocular volume */
+        float s_y_l = 1.0f + kDizzySquashAmp * cosf(s_dizzy_phase);
+        float s_y_r = 1.0f - kDizzySquashAmp * cosf(s_dizzy_phase + kDizzyPhaseLag);
+        float s_x_l = 1.0f / sqrtf(s_y_l);
+        float s_x_r = 1.0f / sqrtf(s_y_r);
+
+        /* 3. Viscoelastic Curvature Plasticity: softens squircle towards organic oval */
+        float n_mod = 0.15f * cosf(2.0f * s_dizzy_phase);
+
+        /* 4. Asynchronous Orbital Vertigo Drift */
+        dizzy_offset_x_l = cosf(s_dizzy_phase) * kDizzyWobbleAmp * s_dizzy_intensity;
+        dizzy_offset_y_l = sinf(s_dizzy_phase) * kDizzyWobbleAmp * s_dizzy_intensity;
+        dizzy_offset_x_r = cosf(s_dizzy_phase + 3.14159265f) * kDizzyWobbleAmp * s_dizzy_intensity;
+        dizzy_offset_y_r = sinf(s_dizzy_phase + 3.14159265f) * kDizzyWobbleAmp * s_dizzy_intensity;
+
+        /* Modulate somatic dimensions smoothly by dizzy intensity */
+        left_w *= (1.0f + (s_x_l - 1.0f) * s_dizzy_intensity);
+        right_w *= (1.0f + (s_x_r - 1.0f) * s_dizzy_intensity);
+        left_h *= (1.0f + (s_y_l - 1.0f) * s_dizzy_intensity);
+        right_h *= (1.0f + (s_y_r - 1.0f) * s_dizzy_intensity);
+        left_n -= n_mod * s_dizzy_intensity;
+        right_n -= n_mod * s_dizzy_intensity;
+        tilt_l += tilt_dizzy_l * s_dizzy_intensity;
+        tilt_r += tilt_dizzy_r * s_dizzy_intensity;
+    }
+
     /* Hardware OLED Contrast Brightness: dynamically linked to metabolic vitality */
     int raw_contrast = 40 + (int)(175.0f * s_metabolic_energy + 25.0f * y1);
     uint8_t hw_contrast = (uint8_t)clamp_f((float)raw_contrast, 30.0f, 255.0f);
 
     /* Store updated soma state */
+    s_current_soma.left_x = SOMA_CANONICAL_LEFT_X + dizzy_offset_x_l;
+    s_current_soma.left_y = SOMA_CANONICAL_CENTER_Y + dizzy_offset_y_l;
+    s_current_soma.right_x = SOMA_CANONICAL_RIGHT_X + dizzy_offset_x_r;
+    s_current_soma.right_y = SOMA_CANONICAL_CENTER_Y + dizzy_offset_y_r;
     s_current_soma.left_w = left_w;
     s_current_soma.right_w = right_w;
     s_current_soma.left_h = left_h;

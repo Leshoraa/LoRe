@@ -265,7 +265,7 @@ The emotional state space is partitioned into 12 canonical expressions:
 8. `EXPR_MISCHIEF`: Playful smirk with slanted brow and squinted lower cheek ($u_{\text{lid}} = 0.15$, $l_{\text{lid}} = 0.25$).
 9. `EXPR_SLEEPY`: Softened, heavy upper lids ($u_{\text{lid}} = 0.42$, $l_{\text{lid}} = 0.15$) drooping over flattened oculi ($h = 18$).
 10. `EXPR_COOL`: Flat horizontal top cutoff ($u_{\text{lid}} = 0.35$, $n = 3.5$) with wide relaxed swagger ($w = 34$).
-11. `EXPR_DIZZY`: Disoriented anime swirl eyes (`@_@`) via dual Archimedean spirals rotating in opposite directions with out-of-phase orbital wobble and twinkling cartoon star particles.
+11. `EXPR_DIZZY`: Disoriented vestibular disturbance and biological tissue conservation (squishy wobbling ovals `\ /`) via bilateral conjugate torsional pendulum and volume-conserving deformation ($S_x = 1/\sqrt{S_y}$).
 12. `EXPR_CRYING`: Trembling outer droop ($\theta_{\text{brow}} = \mp 0.32\text{ rad}$) with palpebral constriction and animated weeping tear drops.
 
 ### 11.2 Dual-Plane Palpebral Slant Formulation
@@ -314,16 +314,30 @@ $$L_{t+\Delta t} = L_t - r_{\text{decay}} \cdot \Delta t$$
 - **`PARTICLE_SWEAT`:** Downward dripping droplet ($3 \times 4\text{ px}$, $v_y = +4.0$) on temporal brow during suspicion or surprise.
 - **State Cleanup:** Expression transitions flush all active particles via `clearOcularParticles()` to prevent emotional bleed.
 
-### 12.3 Hypnotic Archimedean Spiral Swirl & Orbital Wobble Kinematics
-For `EXPR_DIZZY`, static circular geometry is replaced by continuous dynamic, borderless Archimedean spiral oculi:
-$$r(\theta) = r_{\min} + (r_{\max} - r_{\min}) \cdot \frac{\theta}{\theta_{\max}}, \quad \theta \in [0, 6\pi] \text{ (3 full rotational coils)}$$
-$$\begin{bmatrix} x \\ y \end{bmatrix} = \begin{bmatrix} x_c(t) + r(\theta) \cos(\theta + \phi(t)) \\ y_c(t) + r(\theta) \sin(\theta + \phi(t)) \cdot \text{aperture} \end{bmatrix}$$
-- **Opposing Rotational Phase:**
-  $$\phi_{\text{left}}(t) = +\omega_{\text{spin}} \cdot t, \quad \phi_{\text{right}}(t) = -\omega_{\text{spin}} \cdot t \quad (\omega_{\text{spin}} = 0.006\text{ rad/ms} \approx 57\text{ RPM})$$
-- **Asynchronous Orbital Wobble:**
-  The eye centers follow an out-of-phase elliptical orbit to simulate drunken/rolling ocular vertigo:
-  $$\Delta x_{\text{left}}(t) = A_{\text{wobble}} \cos(\omega_{\text{wobble}} t), \quad \Delta y_{\text{left}}(t) = A_{\text{wobble}} \sin(\omega_{\text{wobble}} t)$$
-  $$\Delta x_{\text{right}}(t) = A_{\text{wobble}} \cos(\omega_{\text{wobble}} t + \pi), \quad \Delta y_{\text{right}}(t) = A_{\text{wobble}} \sin(\omega_{\text{wobble}} t + \pi)$$
-  where $A_{\text{wobble}} = 2.0\text{ px}$ and $\omega_{\text{wobble}} = 0.005\text{ rad/ms}$.
-- **Palpebral Blush Accents:**
-  Centered directly beneath each spiral eye at $y_{\text{blush}} = y_c + r_{\max} + 3.5\text{ px}$, an anime-style smooth filled oval ($r_x = 5\text{ px}, r_y = 2\text{ px}$) renders the blushing cheek signature without oral mouth clutter.
+### 12.3 Neuro-Biomechanical Vestibular Disturbance & Torsional Incompressibility Dynamics
+For `EXPR_DIZZY`, ocular geometry is governed by first-principles vestibulo-ocular disorientation dynamics rather than ad-hoc lines:
+
+1. **Conjugate Torsional Pendulum (Vestibulo-Ocular Reflex Disorientation):**
+   Under acute vestibular disturbance (vertigo), semicircular canal signals oscillate out-of-phase, inducing bilateral cyclotorsional rolling of the globes:
+   $$\theta_{\text{tilt,left}}(t) = +\Theta_0 \sin(\omega_{\text{dizzy}} t)$$
+   $$\theta_{\text{tilt,right}}(t) = -\Theta_0 \sin(\omega_{\text{dizzy}} t + \phi_{\text{lag}})$$
+   where $\Theta_0 = 0.28\text{ rad} \approx 16^\circ$, $\omega_{\text{dizzy}} = 4.2\text{ rad/s}$ ($f \approx 0.67\text{ Hz}$, period $\approx 1.5\text{ s}$), and $\phi_{\text{lag}} = 0.12\text{ rad}$ introduces biological asymmetry. The eyes oscillate smoothly between outward splay (`\ /`) and inward splay (`/ \`).
+
+2. **Biological Tissue Conservation Law ($S_x \cdot \sqrt{S_y} = 1.0$):**
+   Soft biological ocular tissue maintains constant volume under dynamic inertial strain ($S_x = 1 / \sqrt{S_y}$):
+   $$S_{y,\text{left}}(t) = 1.0 + \kappa_{\text{squash}} \cos(\omega_{\text{dizzy}} t)$$
+   $$S_{y,\text{right}}(t) = 1.0 - \kappa_{\text{squash}} \cos(\omega_{\text{dizzy}} t + \phi_{\text{lag}})$$
+   $$S_{x,\text{left}}(t) = \frac{1}{\sqrt{S_{y,\text{left}}(t)}}, \quad S_{x,\text{right}}(t) = \frac{1}{\sqrt{S_{y,\text{right}}(t)}}$$
+   where $\kappa_{\text{squash}} = 0.16$. As one eye squashes vertically, it bulges horizontally, conserving ocular volume conjugate to the opposite eye.
+
+3. **Viscoelastic Curvature Plasticity ($n$):**
+   Canonical squircle curvature relaxes from $n = 2.8$ into an organic viscoelastic oval:
+   $$n(t) = 2.05 - 0.15 \cos(2 \omega_{\text{dizzy}} t)$$
+
+4. **Asynchronous Orbital Vertigo Drift:**
+   $$\Delta x_{\text{left}}(t) = A_{\text{wobble}} \cos(\omega_{\text{dizzy}} t), \quad \Delta y_{\text{left}}(t) = A_{\text{wobble}} \sin(\omega_{\text{dizzy}} t)$$
+   $$\Delta x_{\text{right}}(t) = A_{\text{wobble}} \cos(\omega_{\text{dizzy}} t + \pi), \quad \Delta y_{\text{right}}(t) = A_{\text{wobble}} \sin(\omega_{\text{dizzy}} t + \pi)$$
+   where $A_{\text{wobble}} = 1.8\text{ px}$.
+
+5. **Palpebral Blush Accents:**
+   Smooth filled anime blush ovals ($r_x = 5\text{ px}, r_y = 2\text{ px}$) render below each eye at $y_{\text{blush}} = y_c + b + 3.5\text{ px}$ during open aperture ($aperture > 0.40$).

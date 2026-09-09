@@ -134,14 +134,19 @@ int main() {
     assert(soma_sleepy.upper_lid_right > 0.35f);
     std::cout << "[PASS] Continuous morphing to EXPR_SLEEPY heavy upper lid droop verified." << std::endl;
 
-    /* Verify continuous morphing into EXPR_DIZZY */
+    /* Verify continuous morphing into EXPR_DIZZY (Vestibular Disturbance & Tissue Conservation) */
     g_currentExpr = EXPR_DIZZY;
     for (int i = 0; i < 30; ++i) updateAutonomicEngine(dt);
     OcularSomaState soma_dizzy = getOcularSomaState();
-    assert(soma_dizzy.left_w > 26.0f && soma_dizzy.left_w < 30.0f);
-    assert(soma_dizzy.left_h > 26.0f && soma_dizzy.left_h < 30.0f);
-    assert(soma_dizzy.left_n > 1.8f && soma_dizzy.left_n < 2.2f);
-    std::cout << "[PASS] Continuous morphing to EXPR_DIZZY circularized spiral geometry verified." << std::endl;
+    assert(soma_dizzy.left_w > 24.0f && soma_dizzy.left_w < 34.0f);
+    assert(soma_dizzy.left_h > 22.0f && soma_dizzy.left_h < 34.0f);
+    assert(soma_dizzy.left_n > 1.8f && soma_dizzy.left_n < 2.3f);
+    /* Verify biological tissue incompressibility conservation: (Sx * sqrt(Sy) ~ 1.0) */
+    float s_x = soma_dizzy.left_w / 28.0f;
+    float s_y = soma_dizzy.left_h / 28.0f;
+    float incompressibility_residual = std::fabs(s_x * std::sqrt(s_y) - 1.0f);
+    assert(incompressibility_residual < 0.12f);
+    std::cout << "[PASS] Continuous morphing to EXPR_DIZZY vestibular somatic law verified." << std::endl;
 
     /* Return to baseline EXPR_IDLE */
     g_currentExpr = EXPR_IDLE;

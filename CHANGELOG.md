@@ -2,6 +2,16 @@
 
 All notable changes to the LoRe firmware project will be documented in this file.
 
+## [1.3.0] - 2026-09-10
+
+### Refactored
+- Neuro-Biomechanical Physical Law for `EXPR_DIZZY`: replaced the ad-hoc Archimedean spiral line-drawer (`@_@`) with a first-principles continuous physical model:
+  - Bilateral Conjugate Torsional Pendulum ($\Theta_{\text{dizzy}} = \pm 16^\circ$, $\omega = 4.2\text{ rad/s}$, $\phi_{\text{lag}} = 0.12\text{ rad}$) producing dynamic splay oscillation between `\ /` and `/ \`.
+  - Biological Tissue Conservation Law ($S_x = 1 / \sqrt{S_y}$, $\kappa_{\text{squash}} = 0.16$) for volume-conserving out-of-phase squishy blob dynamics.
+  - Viscoelastic Curvature Plasticity ($n \in [1.9, 2.2]$) relaxing the squircle into an organic squishy oval.
+  - Unified 60 FPS Superellipse Pipeline: eliminated `renderDizzySpiralEye` and special-case rendering branches in `facial_renderer.cpp` in compliance with `AI_RULES.md` (Rule 2, Rule 46 & Rule 47).
+  - Compact status bar mini-eye icon updated to tilted squishy capsules with subtle splay notches.
+
 ## [1.2.0] - 2026-09-09
 
 ### Added
