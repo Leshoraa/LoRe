@@ -35,24 +35,12 @@ static uint8_t s_memory_head = 0;
 static float s_latest_resonance = 0.0f;
 static Expression s_latest_recalled_expr = EXPR_IDLE;
 
-/* Associative Expression Reinforcement Matrix [Past Expr 0..7][Logit Target 0..7] */
-static const float s_associative_matrix[8][8] = {
-    /* 0: IDLE recalled     -> IDLE,   JOY,  ANGRY, SMIRK, SHOCK, OVERLOAD,  SAD, DEADPAN */
-    {                          0.4f,  0.1f, -0.2f,  0.1f, -0.5f,  -0.4f,   -0.2f,  0.1f },
-    /* 1: JOY recalled      -> Reinforce JOY & SMIRK, suppress negative */
-    {                         -0.2f,  1.4f, -0.6f,  0.6f, -0.8f,  -0.5f,   -1.0f, -0.6f },
-    /* 2: ANGRY recalled    -> Reinforce ANGRY & Tsundere */
-    {                         -0.1f, -0.6f,  1.2f,  0.2f,  0.3f,   0.2f,   -0.2f,  0.2f },
-    /* 3: SMIRK recalled    -> Reinforce mischievous SMIRK & JOY */
-    {                          0.1f,  0.6f, -0.1f,  1.3f, -0.4f,  -0.3f,   -0.8f, -0.4f },
-    /* 4: SHOCK recalled    -> Vigilance / cautious startle response */
-    {                         -0.4f, -0.6f,  0.5f, -0.3f,  1.1f,   0.6f,    0.1f,  0.0f },
-    /* 5: OVERLOAD recalled -> High fatigue / sensitivity to chaos */
-    {                         -0.5f, -0.6f,  0.4f, -0.4f,  0.6f,   1.2f,    0.2f,  0.3f },
-    /* 6: SAD recalled      -> Melancholy / solitude resonance */
-    {                         -0.2f, -1.0f, -0.3f, -0.7f, -0.2f,  -0.1f,    1.3f,  0.4f },
-    /* 7: DEADPAN recalled  -> Apathy / boredom resonance */
-    {                          0.2f, -0.7f, -0.1f, -0.4f, -0.4f,  -0.3f,    0.3f,  1.2f }
+/* Associative Expression Reinforcement Matrix [Past Expr 0..1][Logit Target 0..1] */
+static const float s_associative_matrix[NUM_EXPRESSIONS][NUM_EXPRESSIONS] = {
+    /* 0: IDLE recalled  -> IDLE,  HAPPY */
+    {                        0.4f, -0.2f },
+    /* 1: HAPPY recalled -> IDLE,  HAPPY */
+    {                       -0.3f,  1.2f }
 };
 
 static float computeCosineSimilarity(const float a[EPISODIC_EMBEDDING_DIM], const float b[EPISODIC_EMBEDDING_DIM]) {
@@ -164,8 +152,8 @@ EpisodicRecallResult queryMemoryResonance(const float state_vector[EPISODIC_EMBE
             result.top_k_count++;
             Expression mem_expr = s_memory_entries[i].expression;
             uint8_t expr_idx = (uint8_t)mem_expr;
-            if (expr_idx < 8) {
-                for (int k = 0; k < 8; k++) {
+            if (expr_idx < NUM_EXPRESSIONS) {
+                for (int k = 0; k < NUM_EXPRESSIONS; k++) {
                     result.memory_logits_delta[k] += effective_weight * s_associative_matrix[expr_idx][k];
                 }
             }
@@ -183,33 +171,16 @@ EpisodicRecallResult queryMemoryResonance(const float state_vector[EPISODIC_EMBE
     s_latest_resonance = result.resonance_score;
     s_latest_recalled_expr = best_expr;
 
-    for (int k = 0; k < 8; k++) {
+    for (int k = 0; k < NUM_EXPRESSIONS; k++) {
         result.memory_logits_delta[k] = fmaxf(-1.5f, fminf(1.5f, result.memory_logits_delta[k]));
     }
 
     if (result.resonance_score > 0.65f && result.top_k_count > 0) {
         switch (best_expr) {
-            case EXPR_JOY:
-                snprintf(result.recall_context, sizeof(result.recall_context), "Remembering fun moments! (Joy resonance)");
+            case EXPR_HAPPY:
+                snprintf(result.recall_context, sizeof(result.recall_context), "Remembering happy moments! (Happy resonance)");
                 break;
-            case EXPR_SMIRK:
-                snprintf(result.recall_context, sizeof(result.recall_context), "Remembering playful teasing (Smirk resonance)");
-                break;
-            case EXPR_SHOCK:
-                snprintf(result.recall_context, sizeof(result.recall_context), "Cautious from past startle (Shock resonance)");
-                break;
-            case EXPR_OVERLOAD:
-                snprintf(result.recall_context, sizeof(result.recall_context), "Sensitive to chaotic motion (Overload memory)");
-                break;
-            case EXPR_SAD:
-                snprintf(result.recall_context, sizeof(result.recall_context), "Recalling lonely quiet (Sadness resonance)");
-                break;
-            case EXPR_ANGRY:
-                snprintf(result.recall_context, sizeof(result.recall_context), "Still pouting from before (Angry resonance)");
-                break;
-            case EXPR_DEADPAN:
-                snprintf(result.recall_context, sizeof(result.recall_context), "Remembering dull wait (Boredom resonance)");
-                break;
+            case EXPR_IDLE:
             default:
                 snprintf(result.recall_context, sizeof(result.recall_context), "Familiar peaceful vibe (Idle resonance)");
                 break;

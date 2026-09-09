@@ -6,6 +6,7 @@
 #include <iostream>
 #include <cassert>
 #include <cmath>
+#include <algorithm>
 #include <vector>
 
 /* Standalone Horner polynomial evaluation */
@@ -121,6 +122,48 @@ int main() {
     assert(max_drift < 0.50f);       // Never blows up into large drift
 
     std::cout << "[PASS] Ornstein-Uhlenbeck stochastic drift satisfies mean-reverting bounded variance requirements." << std::endl;
+
+    // Test 4: Stereoscopic Ocular Vergence from proximity
+    std::cout << "[TEST] Validating stereoscopic ocular vergence mechanics..." << std::endl;
+    for (int i = 0; i <= 100; ++i) {
+        float prox = (float)i / 100.0f; // [0.0, 1.0]
+        float target_v = 0.0f;
+        if (prox > 0.05f) {
+            target_v = std::clamp(prox * 3.2f, 0.0f, 3.5f);
+        }
+        assert(target_v >= 0.0f && target_v <= 3.5f);
+        if (prox <= 0.05f) {
+            assert(target_v == 0.0f);
+        } else if (prox >= 1.0f) {
+            assert(std::fabs(target_v - 3.2f) < 1e-4f);
+        }
+    }
+    std::cout << "[PASS] Stereoscopic ocular vergence bounds [0.0, 3.5] px verified." << std::endl;
+
+    // Test 5: Volume-Conserving Biological Squash & Stretch
+    std::cout << "[TEST] Validating volume-conserving affective tissue deformation..." << std::endl;
+    float arousals[] = {0.05f, 0.20f, 0.50f, 0.90f};
+    float sleep_pressures[] = {0.0f, 0.30f, 0.70f, 1.0f};
+
+    for (float a : arousals) {
+        for (float p_sleep : sleep_pressures) {
+            float sy = 1.0f + (0.15f * (a - 0.20f) - 0.08f * p_sleep);
+            sy = std::clamp(sy, 0.88f, 1.18f);
+            float sx = 1.0f / std::sqrt(sy);
+
+            // Incompressibility volume conservation: Sx^2 * Sy ≈ 1.0
+            float vol = sx * sx * sy;
+            assert(std::fabs(vol - 1.0f) < 1e-5f);
+            assert(sy >= 0.88f && sy <= 1.18f);
+            assert(sx >= 0.90f && sx <= 1.10f);
+        }
+    }
+    // Check resting state at baseline (a = 0.20, p_sleep = 0.0)
+    float base_sy = 1.0f + (0.15f * (0.20f - 0.20f) - 0.08f * 0.0f);
+    float base_sx = 1.0f / std::sqrt(base_sy);
+    assert(std::fabs(base_sy - 1.0f) < 1e-6f);
+    assert(std::fabs(base_sx - 1.0f) < 1e-6f);
+    std::cout << "[PASS] Biological tissue incompressibility and baseline resting preservation verified." << std::endl;
 
     std::cout << "[SUCCESS] All kinematics and dynamic model tests passed." << std::endl;
     return 0;

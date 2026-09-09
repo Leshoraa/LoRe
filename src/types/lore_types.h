@@ -31,14 +31,27 @@ extern "C" {
  */
 typedef enum {
     EXPR_IDLE = 0,
-    EXPR_JOY,
-    EXPR_ANGRY,
-    EXPR_SMIRK,
-    EXPR_SHOCK,
-    EXPR_OVERLOAD,
-    EXPR_SAD,
-    EXPR_DEADPAN
+    EXPR_HAPPY = 1
 } Expression;
+
+#define NUM_EXPRESSIONS 2
+
+/**
+ * @struct OcularSomaState
+ * @brief Continuous parametric morphology and hardware actuation state for LoRe's physical soma.
+ */
+typedef struct {
+    float left_x, left_y;         /* Left eye center coordinates */
+    float right_x, right_y;       /* Right eye center coordinates */
+    float left_w, left_h;         /* Left eye width and height */
+    float right_w, right_h;       /* Right eye width and height */
+    float left_n, right_n;        /* Superellipse Lamé exponent (2.0 = ellipse, 4.0..5.0 = squircle, <2.0 = astroid) */
+    float stroke_thickness;       /* 0.0f = solid filled, 1.0f..4.0f = hollow outline border width */
+    float tilt_left, tilt_right;  /* Eye tilt slant angle in radians */
+    float palpebral_aperture;     /* Upper/lower eyelid opening factor [0.0 = fully closed slit, 1.0 = fully open] */
+    uint8_t hardware_contrast;    /* SSD1306 physical OLED contrast brightness [0..255] */
+    float nystagmus_x, nystagmus_y; /* Sub-pixel physiological micro-tremor */
+} OcularSomaState;
 
 /**
  * @enum BlinkState
@@ -47,6 +60,7 @@ typedef enum {
 typedef enum {
     BLINK_IDLE_STATE = 0,
     BLINK_CLOSING_STATE,
+    BLINK_CLOSED_STATE,
     BLINK_OPENING_STATE
 } BlinkState;
 

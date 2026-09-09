@@ -8,6 +8,7 @@
 #include <cstring>
 #include <string>
 #include <vector>
+#include "src/net/net_utils.h"
 
 static void wrapMessageLines(const char* msg, std::vector<std::string>& lines, size_t max_lines = 3, size_t max_width = 20) {
     lines.clear();
@@ -50,6 +51,24 @@ int main() {
     assert(lines2[0].length() <= 20);
     assert(lines2[1].length() <= 20);
     std::cout << "[PASS] Word wrapping cleanly splits words across lines." << std::endl;
+
+    // Test 3: Notification App Classification
+    char app_buf[16];
+    classify_notification_app("[WA] Budi", "Halo bro", app_buf, sizeof(app_buf));
+    assert(strcmp(app_buf, "WhatsApp") == 0);
+
+    classify_notification_app("Sarah", "Sent via Telegram", app_buf, sizeof(app_buf));
+    assert(strcmp(app_buf, "Telegram") == 0);
+
+    classify_notification_app("Boss", "Check your Gmail inbox", app_buf, sizeof(app_buf));
+    assert(strcmp(app_buf, "Gmail") == 0);
+
+    classify_notification_app("OTP", "Kode verifikasi SMS", app_buf, sizeof(app_buf));
+    assert(strcmp(app_buf, "SMS") == 0);
+
+    classify_notification_app("General Channel", "Discord announcement", app_buf, sizeof(app_buf));
+    assert(strcmp(app_buf, "Discord") == 0);
+    std::cout << "[PASS] App classification correctly maps messaging apps." << std::endl;
 
     std::cout << "[SUCCESS] All Notification Parsing & Wrapping tests passed!" << std::endl;
     return 0;

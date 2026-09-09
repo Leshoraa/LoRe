@@ -9,6 +9,7 @@
 #include "src/config/lore_config.h"
 #include "src/types/lore_types.h"
 #include "src/math/kinematics.h"
+#include "src/ai/autonomic_engine.h"
 #include <math.h>
 #include <Arduino.h>
 #include <esp_random.h>
@@ -59,13 +60,7 @@ bool isManualExpressionActive(void) {
 const char* getExpressionName(Expression expr) {
     switch (expr) {
         case EXPR_IDLE:     return "IDLE";
-        case EXPR_JOY:      return "JOY";
-        case EXPR_ANGRY:    return "ANGRY";
-        case EXPR_SMIRK:    return "SMIRK";
-        case EXPR_SHOCK:    return "SHOCK";
-        case EXPR_OVERLOAD: return "OVERLOAD";
-        case EXPR_SAD:      return "SAD";
-        case EXPR_DEADPAN:  return "DEADPAN";
+        case EXPR_HAPPY:    return "HAPPY";
         default:            return "IDLE";
     }
 }
@@ -78,7 +73,6 @@ void setNextExpression(Expression newExpr) {
         g_blinkState = BLINK_IDLE_STATE;
         g_blinkEyeHeight = 1.0f;
         uint32_t blink_iv = getPersonalityBlinkInterval();
-        if (newExpr == EXPR_ANGRY) blink_iv = (uint32_t)(blink_iv * 1.20f);
         g_nextBlinkTime = millis() + blink_iv;
         g_is_transitioning = false;
     }
@@ -90,7 +84,7 @@ void updateBiologicalMoodEngine(void) {
     if (s_manual_expr_pending) {
         s_manual_expr_pending = false;
         int code = s_pending_expr_code;
-        if (code < 0 || code > 7) {
+        if (code < 0 || code >= NUM_EXPRESSIONS) {
             s_manual_override = false;
             s_manual_expr_code = -1;
             s_mood_lock_until = 0;
@@ -157,8 +151,9 @@ void updateBiologicalMoodEngine(void) {
         /* Clear / mild weather keeps neutral baseline for natural EXPR_IDLE */
     }
 
-    float target_v = 0.05f + circa.mood_baseline + weather_v_bias;
-    float target_a = (0.12f + weather_a_bias) * circa.energy_level;
+    AutonomicTelemetry auto_tel = getAutonomicTelemetry();
+    float target_v = 0.05f + 0.05f * auto_tel.respiration_phase + circa.mood_baseline + weather_v_bias;
+    float target_a = (0.12f + 0.08f * fabsf(auto_tel.respiration_phase) + weather_a_bias) * circa.energy_level * auto_tel.metabolic_energy;
 
     if (is_detected) {
         float bonding = getBrainBondingLevel();

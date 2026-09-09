@@ -1,6 +1,6 @@
 /**
  * @file wifi_manager.h
- * @brief Wi-Fi STA connection, SoftAP fallback, mDNS, NetBIOS, and DNS captive portal.
+ * @brief Wi-Fi STA connection, SoftAP fallback, mDNS, and DNS captive portal.
  */
 
 #ifndef LORE_WIFI_MANAGER_H

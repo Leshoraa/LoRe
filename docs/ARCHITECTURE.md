@@ -20,6 +20,7 @@ LoRe/
 │   ├── lore_kinematics.h      # Kinematics forwarding header
 │   ├── lore_affective.h       # Affective engine forwarding header
 │   ├── lore_ai.h              # Brain engine forwarding header
+│   ├── lore_autonomic.h       # Autonomic engine forwarding header
 │   └── lore_personality.h     # Personality engine forwarding header
 ├── src/
 │   ├── config/                # Configuration and persistent storage layer
@@ -33,17 +34,18 @@ LoRe/
 │   │   ├── kinematics.h/cpp   # 5th-order minimum-jerk saccades & underdamped mass-spring-damper
 │   │   └── affective_engine.h/cpp # Russell Circumplex Langevin stochastic diffusion engine
 │   ├── ai/                    # Autonomous behavior and cognitive synthesis
+│   │   ├── autonomic_engine.h/cpp # Matsuoka CPG, metabolic homeostasis & continuous soma
 │   │   ├── brain_engine.h/cpp # 5 homeostatic drives and feedforward neural action selector
 │   │   ├── personality_engine.h/cpp # Four-factor OCEAN-derived traits and circadian rhythm
 │   │   ├── memory_engine.h/cpp# 32-slot episodic vector memory with cosine similarity retrieval
 │   │   └── markov_corpus.h/cpp# Markov chain thought string synthesis
 │   ├── core/                  # Display orchestration and ocular rendering
 │   │   ├── display_engine.h/cpp # LovyanGFX I2C bus setup, oledTask loop, auto-brightness & burn-in shift
-│   │   ├── facial_renderer.h/cpp# 2D rigid geometry (eyes, mouth, blush) and expression easing
+│   │   ├── facial_renderer.h/cpp# Continuous Superellipse soma morphology, vergence & easing
 │   │   ├── ambient_screens.h/cpp# Clock, Open-Meteo Weather, Mobile Notification & Navigation HUD
 │   │   └── gaze_engine.h/cpp  # Autonomous gaze coordination, stimulus decay & DFS power scaling
 │   └── net/                   # Communication, protocols, and APIs
-│       ├── wifi_manager.h/cpp # Wi-Fi STA connection, SoftAP fallback, mDNS, NetBIOS & captive portal
+│       ├── wifi_manager.h/cpp # Wi-Fi STA connection, SoftAP fallback, mDNS & captive portal
 │       ├── http_server.h/cpp  # Asynchronous HTTP server (Port 80), REST endpoints & OTA updates
 │       ├── web_ui.h           # Self-contained compressed single-page HTML/CSS/JS dashboard
 │       ├── ble_manager.h/cpp  # BLE Nordic UART Service (NUS) GATT server & companion stream
@@ -51,13 +53,13 @@ LoRe/
 │       ├── weather_client.h/cpp # Background Open-Meteo REST forecast fetcher
 │       ├── notification_client.h/cpp # Background Ntfy.sh NDJSON stream listener
 │       └── net_utils.h/cpp    # Shared JSON key-value extraction and notification classification
-├── tests/                     # Host unit test suite (9 tests, zero Arduino dependencies)
+├── tests/                     # Host unit test suite (12 tests, zero Arduino dependencies)
 ├── scripts/                   # Build and test orchestration scripts
 │   ├── build.sh               # arduino-cli compile wrapper for ESP32-S3
 │   └── run_tests.sh           # C++20 host test runner (g++ -O3 -std=c++20)
 └── docs/                      # Technical specifications and architecture records
     ├── ARCHITECTURE.md        # System architecture and memory partitioning
-    └── adr/                   # Architecture Decision Records (ADR-001 through ADR-004)
+    └── adr/                   # Architecture Decision Records (ADR-001 through ADR-005)
 ```
 
 ---
@@ -87,12 +89,12 @@ LoRe/
 | CORE 1: oledTask (Priority 1, 60 FPS Kinematics & Rendering Loop)               |
 | - 2D Russell Circumplex Affective Engine (Valence-Arousal Langevin Diffusion)   |
 | - On-Device TinyML Micro-Brain (Homeostatic Drives & Markov Action Selection)   |
-| - Unified Rigid 2D Facial Rig (8 Expressions, Eyes, Eyebrows, Mouth)           |
+| - Unified Rigid 2D Facial Rig (2 Expressions: IDLE, HAPPY)                      |
 | - Coordinate Hysteresis Filtering (getFilteredOx, getFilteredOy)                |
 | - Ocular Dynamics (32.0 rad/s Underdamped Mass-Spring-Damper, zeta = 0.72)      |
 | - 5th-Order Minimum-Jerk Saccades (Flash & Hogan Formulation)                   |
 | - Fixation Micro-Kinetics (Mean-Reverting Brownian Random Walk)                 |
-| - Non-Blocking Eyelid State Machine (Idle -> Closing -> Opening -> Blink-Chain) |
+| - Non-Blocking Eyelid State Machine (Idle -> Closing -> Closed Dwell -> Opening -> Blink-Chain / Drowsy Doze) |
 | - OLED Anti-Burn-In Protection (+/-1 px Micro-Shift during Standby)             |
 | - Ambient Screens (Clock, Open-Meteo Weather, Push Notification, Turn-by-Turn)   |
 | - LovyanGFX 1-Bit Monochrome Sprite Renderer (1.0 MHz Fast-Mode Plus I2C Bus)   |
@@ -125,14 +127,23 @@ LoRe/
 
 ---
 
-## 6. Dynamic Frequency Scaling (DFS) and Power States
+## 6. Dynamic Frequency Scaling (DFS), Circadian Lifecycle, and Power States
 
-- **Active Mode (Target Engaged or Web Client Active):**
-  - CPU frequency: 240 MHz via `setCpuFrequencyMhz(240)`.
-  - OLED refresh: 60 FPS (16.66 ms frame budget).
-  - Wi-Fi and BLE active.
-- **Standby Mode (Inactivity for $> 5000\text{ ms}$):**
-  - CPU frequency: 80 MHz via `setCpuFrequencyMhz(80)`.
-  - OLED refresh: 30 FPS (33.33 ms frame budget).
-  - Anti-burn-in micro-pixel orbit shift ($\pm 1\text{ px}$) randomized every 35 seconds.
-  - Spontaneous biological wake-up pulse every 40-100 seconds.
+- **Active Mode (Daytime Wakefulness & Interactive Sessions):**
+  - CPU frequency: 240 MHz (`CPU_FREQ_ACTIVE_MHZ`).
+  - OLED refresh: 60.0 FPS enforced with microsecond precision pacing (`FRAME_BUDGET_ACTIVE_US = 16666`) on Core 1 (`delayMicroseconds` + `taskYIELD()`), completely eliminating FreeRTOS 10 ms tick jitter.
+  - Ocular dynamics: full 5th-order minimum-jerk saccades and 4-phase biomechanical blinks (closing 85 ms, contact dwell 25 ms, opening 175 ms).
+  - Wi-Fi, BLE, and background network services active.
+- **Drowsy Mode (Late Evening 23:00–01:00):**
+  - CPU frequency: 240 MHz (fluid rendering maintained).
+  - Resting palpebral aperture gently relaxes: $h_{\text{idle}} = 1.0 - 0.08 \cdot D_{\text{circadian}}$ ($h \approx 0.92$).
+  - Sluggish blink kinetics: closing stretches up to 125 ms, opening up to 245 ms.
+  - Periodic 1.5-second micro-sleep dozes (`s_is_drowsy_doze` contact dwell = 1500 ms) simulate organic biological sleepiness without artificial squinting.
+- **Circadian Deep Sleep Mode (Night 01:00–05:30 / Sunrise):**
+  - Triggered automatically when `is_oled_deep_sleep_enabled()` and `isCircadianDeepSleepTime()` are active, with no active user web/BLE activity or ambient notifications.
+  - Smooth eyelid closure transition down to closed slit ($h \to 0.0$).
+  - OLED display panel powered down (`lcd.sleep()`, 0xAE display off), eliminating dark-room glare and protecting against OLED burn-in.
+  - CPU scales down to 80 MHz (`CPU_FREQ_SLEEP_MHZ`), drastically reducing thermal dissipation and power draw.
+  - Core 1 yields in 50 ms tick intervals while monitoring circadian state.
+  - Automatic morning wake-up at 05:30 or astronomical sunrise: CPU ramps up to 240 MHz, OLED panel powers on (`lcd.wakeup()`), contrast brightness restored, and eyes open smoothly (`BLINK_OPENING_STATE`).
+  - Temporary interaction wake: Web UI activity or BLE companion resets sleep lock for 15 seconds; high-priority push notifications immediately trigger startle reaction and wake the display.

@@ -137,7 +137,8 @@ void pushLocalNotification(const char* app, const char* title, const char* messa
 
 static void ntfyTask(void *pvParameters) {
     (void)pvParameters;
-    vTaskDelay(pdMS_TO_TICKS(2500));
+    /* Allow network interface, DHCP negotiation, and SNTP time sync to settle before opening HTTP socket */
+    vTaskDelay(pdMS_TO_TICKS(6000));
 
     ensureDefaultTopic();
 

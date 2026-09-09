@@ -35,6 +35,9 @@ int getFilteredOx(float rawOffsetX);
 int getFilteredOy(float rawOffsetY);
 void resetHysteresisFilter(void);
 void updateGazeSystem(void);
+float getAffectiveEyeScaleX(void);
+float getAffectiveEyeScaleY(void);
+float getOcularVergence(void);
 
 #ifdef __cplusplus
 }

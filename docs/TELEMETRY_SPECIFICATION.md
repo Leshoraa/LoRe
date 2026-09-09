@@ -1,10 +1,9 @@
-# LoRe Telemetry and Streaming API Specification
+# LoRe Telemetry and Control API Specification
 
 ## 1. Overview
 
-LoRe hosts a lightweight, asynchronous dual-port HTTP server on the ESP32-S3:
-- **Port 80:** Web Control Dashboard, Wi-Fi Configuration API, and JSON Telemetry.
-- **Port 81:** Non-blocking multipart MJPEG video stream.
+LoRe hosts a lightweight, asynchronous single-port HTTP server on the ESP32-S3:
+- **Port 80:** Web Control Dashboard, Wi-Fi Configuration API, System Status, Ambient HUD Triggers, and JSON Telemetry.
 
 ---
 
@@ -12,7 +11,7 @@ LoRe hosts a lightweight, asynchronous dual-port HTTP server on the ESP32-S3:
 
 ### 2.1 Web Dashboard
 - **URL:** `GET http://<ESP32_IP>/`
-- **Response:** `text/html` (Production dashboard with dark matte technical surface and skeleton loader).
+- **Response:** `text/html` (Embedded Bento Grid production dashboard with dark matte technical surface).
 
 ### 2.2 Real-Time JSON Telemetry
 - **URL:** `GET http://<ESP32_IP>/telemetry`
@@ -20,6 +19,7 @@ LoRe hosts a lightweight, asynchronous dual-port HTTP server on the ESP32-S3:
 - **Schema:**
 ```json
 {
+  "type": "telemetry",
   "detected": true,
   "x": 210,
   "y": 140,
@@ -30,49 +30,91 @@ LoRe hosts a lightweight, asynchronous dual-port HTTP server on the ESP32-S3:
   "err_x": -6.2,
   "err_y": 4.1,
   "conf": 0.94,
-  "fps_ai": 31.5,
+  "human_likelihood": 0.85,
+  "fps_ai": 60.0,
   "fw": 640,
   "fh": 480,
   "vx": -1.2,
   "vy": 0.4,
-  "prox": 0.85,
-  "num_cands": 3,
+  "prox": 0.70,
+  "num_cands": 0,
   "insp_idx": 0,
-  "c0_cx": 300,
-  "c0_cy": 250,
-  "c0_w": 120,
-  "c0_h": 140,
-  "c0_p": 142.5,
-  "c1_cx": 120,
-  "c1_cy": 180,
-  "c1_w": 90,
-  "c1_h": 110,
-  "c1_p": 88.2,
-  "c2_cx": 480,
-  "c2_cy": 310,
-  "c2_w": 80,
-  "c2_h": 95,
-  "c2_p": 64.1,
-  "expr": 3,
-  "expr_name": "SMIRK",
+  "c0_cx": 0,
+  "c0_cy": 0,
+  "c0_w": 0,
+  "c0_h": 0,
+  "c0_p": 0.0,
+  "c1_cx": 0,
+  "c1_cy": 0,
+  "c1_w": 0,
+  "c1_h": 0,
+  "c1_p": 0.0,
+  "c2_cx": 0,
+  "c2_cy": 0,
+  "c2_w": 0,
+  "c2_h": 0,
+  "c2_p": 0.0,
+  "expr": 0,
+  "expr_name": "IDLE",
   "is_manual": false,
-  "valence": 0.35,
-  "arousal": 0.60,
-  "heap_free": 125432,
-  "psram_free": 7340032,
+  "valence": 0.15,
+  "arousal": 0.45,
+  "curiosity": 0.60,
+  "social": 0.50,
+  "boredom": 0.20,
+  "fatigue": 0.10,
+  "mischief": 0.30,
+  "thought": "observing quiet horizon",
+  "interact_s": 120,
+  "solitude_s": 45,
+  "bonding": 0.42,
+  "life_s": 3600,
+  "mem_count": 8,
+  "mem_res": 0.88,
+  "mem_expr": 0,
+  "heap_free": 284000,
+  "psram_free": 0,
   "uptime_s": 3600,
-  "cpu_mhz": 240
+  "cpu_mhz": 240,
+  "cam_sleep": false,
+  "cam_online": false,
+  "brightness": 128,
+  "auto_brightness": true,
+  "personality": {
+    "boldness": 0.65,
+    "volatility": 0.40,
+    "playfulness": 0.70,
+    "attachment": 0.55
+  },
+  "circadian": {
+    "energy": 0.82,
+    "mood_offset": 0.05,
+    "phase_pct": 42.5
+  }
 }
 ```
 
 ### 2.3 Expression Control
 - **`POST /set_expression`:** Sets the manual face expression override or restores default auto mood engine.
-  - **Body:** `{"expr": 3}` (0: IDLE, 1: JOY, 2: ANGRY, 3: SMIRK, 4: SHOCK, 5: OVERLOAD, 6: SAD, 7: DEADPAN) or `{"expr": "auto"}` / `{"expr": -1}` to restore default.
+  - **Body:** `{"expr": 0}` (0: IDLE, 1: HAPPY) or `{"expr": "auto"}` / `{"expr": -1}` to restore default.
   - **Response:** `{"status": "ok"}`
 
-### 2.4 MJPEG Video Stream
-- **URL:** `GET http://<ESP32_IP>:81/stream`
-- **Response:** `multipart/x-mixed-replace;boundary=123456789000000000000987654321`
+### 2.4 Ambient HUD & Screen Triggers
+- **`POST /trigger_weather`:** Triggers 6-second weather forecast glance HUD screen display on the OLED panel.
+  - **Response:** `{"status": "ok"}`
+- **`POST /trigger_clock`:** Triggers 6-second digital clock and date glance HUD screen display on the OLED panel.
+  - **Response:** `{"status": "ok"}`
+- **`POST /sync_time`:** Synchronizes real-time epoch from client browser to internal RTC.
+  - **Body:** `{"epoch": 1725810000}`
+  - **Response:** `{"status": "ok"}`
+- **`POST /api/notify`:** Dispatches notification banner popup to OLED panel with startle reaction.
+  - **Body:** `{"app": "WA", "title": "John", "message": "Arrived at station"}`
+  - **Response:** `{"status": "ok"}`
+- **`GET /api/ntfy`:** Retrieves current Ntfy.sh background stream topic and enabled status.
+  - **Response:** `{"topic": "lore-demo", "enabled": true}`
+- **`POST /api/ntfy`:** Configures Ntfy.sh background stream topic and enabled flag with NVS persistence.
+  - **Body:** `{"topic": "my-ntfy-topic", "enabled": true}`
+  - **Response:** `{"status": "ok"}`
 
 ### 2.5 Wi-Fi Configuration
 - **`GET /get_wifi`:** Returns current saved credentials and mode flag.

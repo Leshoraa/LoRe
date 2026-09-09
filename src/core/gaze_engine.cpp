@@ -17,7 +17,7 @@ TrackTarget g_current_target;
 ObjectCandidate g_object_candidates[MAX_OBJECT_CANDIDATES];
 int g_num_candidates = 0;
 int g_inspected_candidate_idx = 0;
-volatile ReconState g_recon_state = STATE_SLEEP_RECON;
+volatile ReconState g_recon_state = STATE_ACTIVE;
 volatile float g_fps_ai = 60.0f;
 volatile uint32_t g_last_web_activity_ms = 0;
 volatile uint8_t g_oled_brightness = OLED_DEFAULT_BRIGHTNESS;
@@ -90,9 +90,9 @@ void initGazeEngine(void) {
     g_nav_info.total_dist[0] = '\0';
     g_nav_info.updated_ms = 0;
 
-    s_last_active_activity_ms = 0;
-    setCpuFrequencyMhz(CPU_FREQ_SLEEP_MHZ);
-    LORE_LOG_INF("GAZE", "Autonomous gaze engine initialized in SLEEP_RECON mode");
+    s_last_active_activity_ms = millis();
+    setCpuFrequencyMhz(CPU_FREQ_ACTIVE_MHZ);
+    LORE_LOG_INF("GAZE", "Autonomous gaze engine initialized in ACTIVE mode");
 }
 
 void setVirtualTarget(float normX, float normY, float duration_ms) {
@@ -126,7 +126,7 @@ void gazeTask(void *pvParameters) {
     while (true) {
         uint32_t now = millis();
 
-        /* Handle virtual target expiration */
+        /* Handle virtual target expiration: seamlessly return to autonomous saccades */
         if (s_virtual_target_until_ms > 0 && now >= s_virtual_target_until_ms) {
             s_virtual_target_until_ms = 0;
             portENTER_CRITICAL(&g_target_mutex);
@@ -134,26 +134,6 @@ void gazeTask(void *pvParameters) {
             g_current_target.confidence = 0.0f;
             g_current_target.human_likelihood = 0.0f;
             portEXIT_CRITICAL(&g_target_mutex);
-
-            if (g_recon_state == STATE_ACTIVE) {
-                g_recon_state = STATE_SLEEP_RECON;
-                setCpuFrequencyMhz(CPU_FREQ_SLEEP_MHZ);
-            }
-        }
-
-        /* Active state is strictly allowed ONLY while a manual web gaze target is active */
-        if (g_recon_state == STATE_ACTIVE) {
-            if (s_virtual_target_until_ms == 0 || (now - s_last_active_activity_ms > ACTIVE_STATE_TIMEOUT_MS)) {
-                s_virtual_target_until_ms = 0;
-                portENTER_CRITICAL(&g_target_mutex);
-                g_current_target.detected = false;
-                g_current_target.confidence = 0.0f;
-                g_current_target.human_likelihood = 0.0f;
-                portEXIT_CRITICAL(&g_target_mutex);
-
-                g_recon_state = STATE_SLEEP_RECON;
-                setCpuFrequencyMhz(CPU_FREQ_SLEEP_MHZ);
-            }
         }
 
         vTaskDelay(pdMS_TO_TICKS(100));

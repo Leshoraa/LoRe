@@ -11,16 +11,169 @@
 #include "src/types/lore_types.h"
 #include "src/math/kinematics.h"
 #include "src/math/affective_engine.h"
+#include "src/net/wifi_manager.h"
 #include <Arduino.h>
 #include <time.h>
 #include <sys/time.h>
 #include <math.h>
+#include <ctype.h>
 
 static LGFX_Sprite* s_ambient_canvas = &canvas;
 
 void set_ambient_canvas(LGFX_Sprite* p_canvas) {
     if (p_canvas) {
         s_ambient_canvas = p_canvas;
+    }
+}
+
+static void draw_wifi_status_icon(LGFX_Sprite& cv, int x, int y, bool is_connected) {
+    if (is_connected) {
+        cv.fillRect(x,     y + 4, 2, 3, TFT_WHITE);
+        cv.fillRect(x + 3, y + 2, 2, 5, TFT_WHITE);
+        cv.fillRect(x + 6, y,     2, 7, TFT_WHITE);
+        cv.setTextSize(1);
+        cv.setTextColor(TFT_WHITE, TFT_BLACK);
+        cv.setCursor(x + 10, y);
+        cv.print("ON");
+    } else {
+        cv.drawRect(x,     y + 4, 2, 3, TFT_WHITE);
+        cv.drawRect(x + 3, y + 2, 2, 5, TFT_WHITE);
+        cv.drawRect(x + 6, y,     2, 7, TFT_WHITE);
+        cv.drawLine(x - 1, y - 1, x + 9, y + 8, TFT_WHITE);
+        cv.setTextSize(1);
+        cv.setTextColor(TFT_WHITE, TFT_BLACK);
+        cv.setCursor(x + 10, y);
+        cv.print("NC");
+    }
+}
+
+static void draw_heartbeat_icon(LGFX_Sprite& cv, int x, int y, bool is_beating, bool is_synced) {
+    if (is_beating) {
+        cv.fillRect(x + 1, y,     2, 2, TFT_WHITE);
+        cv.fillRect(x + 5, y,     2, 2, TFT_WHITE);
+        cv.fillRect(x,     y + 2, 8, 2, TFT_WHITE);
+        cv.fillRect(x + 1, y + 4, 6, 2, TFT_WHITE);
+        cv.fillRect(x + 3, y + 6, 2, 1, TFT_WHITE);
+    } else {
+        cv.drawPixel(x + 1, y,     TFT_WHITE);
+        cv.drawPixel(x + 6, y,     TFT_WHITE);
+        cv.drawPixel(x,     y + 2, TFT_WHITE);
+        cv.drawPixel(x + 7, y + 2, TFT_WHITE);
+        cv.drawPixel(x + 2, y + 5, TFT_WHITE);
+        cv.drawPixel(x + 5, y + 5, TFT_WHITE);
+        cv.drawPixel(x + 3, y + 6, TFT_WHITE);
+        cv.drawPixel(x + 4, y + 6, TFT_WHITE);
+    }
+    cv.setTextSize(1);
+    cv.setTextColor(TFT_WHITE, TFT_BLACK);
+    cv.setCursor(x + 10, y);
+    cv.print(is_synced ? "OK" : "..");
+}
+
+static void draw_weather_glyph(LGFX_Sprite& cv, int weather_code, int icx, int icy, float animFrame) {
+    int code = weather_code;
+    if (code == 0 || code == 1) {
+        /* Sun: solid glowing core + 8 animated rotating corona rays */
+        cv.fillCircle(icx, icy, 5, TFT_WHITE);
+        for (int i = 0; i < 8; i++) {
+            float angle = (float)i * (2.0f * (float)M_PI / 8.0f) + animFrame * 0.16f;
+            int x1 = icx + (int)roundf(cosf(angle) * 7.0f);
+            int y1 = icy + (int)roundf(sinf(angle) * 7.0f);
+            int x2 = icx + (int)roundf(cosf(angle) * 11.0f);
+            int y2 = icy + (int)roundf(sinf(angle) * 11.0f);
+            cv.drawLine(x1, y1, x2, y2, TFT_WHITE);
+        }
+    } else if ((code >= 51 && code <= 67) || (code >= 80 && code <= 82)) {
+        /* Rain: detailed puffy cloud + 3 animated slanted falling raindrops */
+        cv.fillCircle(icx - 6, icy - 3, 4, TFT_WHITE);
+        cv.fillCircle(icx,     icy - 6, 6, TFT_WHITE);
+        cv.fillCircle(icx + 6, icy - 3, 4, TFT_WHITE);
+        cv.fillRect(icx - 9,   icy - 3, 18, 5, TFT_WHITE);
+
+        int drop_shift = ((int)(animFrame * 5.0f)) % 5;
+        for (int r = -6; r <= 6; r += 6) {
+            int rx = icx + r;
+            int ry = icy + 3 + drop_shift;
+            cv.drawLine(rx, ry, rx - 1, ry + 2, TFT_WHITE);
+        }
+    } else if (code >= 95 && code <= 99) {
+        /* Thunderstorm: cloud + flashing zigzag lightning bolt */
+        cv.fillCircle(icx - 6, icy - 3, 4, TFT_WHITE);
+        cv.fillCircle(icx,     icy - 6, 6, TFT_WHITE);
+        cv.fillCircle(icx + 6, icy - 3, 4, TFT_WHITE);
+        cv.fillRect(icx - 9,   icy - 3, 18, 5, TFT_WHITE);
+
+        bool bolt_on = ((int)(animFrame * 6.0f) % 3) != 0;
+        if (bolt_on) {
+            cv.drawLine(icx,     icy + 2, icx - 3, icy + 6,  TFT_WHITE);
+            cv.drawLine(icx - 3, icy + 6, icx + 1, icy + 6,  TFT_WHITE);
+            cv.drawLine(icx + 1, icy + 6, icx - 2, icy + 12, TFT_WHITE);
+        }
+    } else if (code == 45 || code == 48) {
+        /* Fog: 3 stratified wavy mist lines */
+        cv.drawFastHLine(icx - 11, icy - 5, 22, TFT_WHITE);
+        cv.drawFastHLine(icx - 8,  icy,     16, TFT_WHITE);
+        cv.drawFastHLine(icx - 11, icy + 5, 22, TFT_WHITE);
+    } else {
+        /* Clouds / Overcast */
+        if (code == 2) {
+            /* Partly cloudy: sun disc peeking behind */
+            cv.drawCircle(icx + 7, icy - 7, 4, TFT_WHITE);
+            cv.fillCircle(icx + 7, icy - 7, 2, TFT_WHITE);
+        }
+        cv.fillCircle(icx - 6, icy - 3, 5, TFT_WHITE);
+        cv.fillCircle(icx,     icy - 6, 7, TFT_WHITE);
+        cv.fillCircle(icx + 6, icy - 3, 5, TFT_WHITE);
+        cv.fillRect(icx - 9,   icy - 3, 18, 6, TFT_WHITE);
+    }
+}
+
+static void draw_attention_bell(LGFX_Sprite& cv, int bx, int by, float animFrame) {
+    /* Oscillate bell tilting left-right */
+    int wiggle = (int)(sinf(animFrame * 7.0f) * 1.6f);
+    int cx = bx + wiggle;
+
+    /* Bell dome & flare */
+    cv.fillCircle(cx, by - 2, 2, TFT_WHITE);
+    cv.fillRect(cx - 3, by - 2, 7, 3, TFT_WHITE);
+    cv.drawFastHLine(cx - 4, by + 1, 9, TFT_WHITE);
+    /* Bell clapper */
+    cv.fillCircle(cx, by + 3, 1, TFT_WHITE);
+
+    /* Dynamic radiating acoustic wave brackets */
+    bool pulse = ((int)(animFrame * 4.0f) % 2 == 0);
+    if (pulse) {
+        cv.drawPixel(cx - 6, by - 2, TFT_WHITE);
+        cv.drawPixel(cx - 7, by,     TFT_WHITE);
+        cv.drawPixel(cx - 6, by + 2, TFT_WHITE);
+
+        cv.drawPixel(cx + 6, by - 2, TFT_WHITE);
+        cv.drawPixel(cx + 7, by,     TFT_WHITE);
+        cv.drawPixel(cx + 6, by + 2, TFT_WHITE);
+    }
+}
+
+static void wrap_notification_text(const char* msg, char lines[2][22]) {
+    lines[0][0] = '\0';
+    lines[1][0] = '\0';
+    if (!msg || msg[0] == '\0') return;
+
+    size_t len = strlen(msg);
+    size_t pos = 0;
+    for (size_t l = 0; l < 2 && pos < len; l++) {
+        size_t take = (len - pos > 20) ? 20 : (len - pos);
+        if (take == 20 && pos + take < len && msg[pos + take] != ' ' && msg[pos + take - 1] != ' ') {
+            size_t last_space = 0;
+            for (size_t s = 0; s < take; s++) {
+                if (msg[pos + s] == ' ') last_space = s;
+            }
+            if (last_space > 5) take = last_space;
+        }
+        size_t copy_len = (take < 21) ? take : 21;
+        strncpy(lines[l], msg + pos, copy_len);
+        lines[l][copy_len] = '\0';
+        while (pos + take < len && msg[pos + take] == ' ') take++;
+        pos += take;
     }
 }
 
@@ -36,40 +189,86 @@ void renderClockToCanvas(float animFrame, int offsetY) {
         memset(&timeinfo, 0, sizeof(timeinfo));
     }
 
+    /* Top Header: Wi-Fi status on left */
+    draw_wifi_status_icon(cv, 6, 7 + offsetY, isWiFiConnected());
+
+    /* Top Header: Live heartbeat / NTP sync indicator on right */
+    bool heart_beat = time_synced ? (timeinfo.tm_sec % 2 == 0) : ((int)(animFrame * 3.0f) % 2 == 0);
+    draw_heartbeat_icon(cv, 97, 7 + offsetY, heart_beat, time_synced);
+
+    /* Separator line framing status header */
+    cv.drawFastHLine(6, 23 + offsetY, OLED_PANEL_WIDTH_PX - 12, TFT_WHITE);
+    cv.drawPixel(6, 22 + offsetY, TFT_WHITE);
+    cv.drawPixel(OLED_PANEL_WIDTH_PX - 7, 22 + offsetY, TFT_WHITE);
+
+    /* Hero Digital Clock format */
     char hm_buf[8];
+    bool colon_on = time_synced ? (timeinfo.tm_sec % 2 == 0) : ((int)(animFrame * 2.5f) % 2 == 0);
     if (time_synced) {
-        bool colon_on = (timeinfo.tm_sec % 2 == 0) || ((int)(animFrame * 2.5f) % 2 == 0);
         snprintf(hm_buf, sizeof(hm_buf), "%02d%c%02d", timeinfo.tm_hour, colon_on ? ':' : ' ', timeinfo.tm_min);
     } else {
-        bool colon_on = ((int)(animFrame * 2.5f) % 2 == 0);
         snprintf(hm_buf, sizeof(hm_buf), "--%c--", colon_on ? ':' : ' ');
     }
 
-    int time_w = 5 * 12; /* Size 2: 12 px per char * 5 = 60 px */
-    int time_x = (OLED_PANEL_WIDTH_PX - time_w) / 2;
+    /* Left analog micro-clock glyph */
+    cv.drawCircle(16, 33 + offsetY, 6, TFT_WHITE);
+    cv.drawLine(16, 33 + offsetY, 16, 30 + offsetY, TFT_WHITE);
+    cv.drawLine(16, 33 + offsetY, 19, 33 + offsetY, TFT_WHITE);
+
+    /* Centered big digital digits */
     cv.setTextSize(2);
     cv.setTextColor(TFT_WHITE, TFT_BLACK);
-    cv.setCursor(time_x, 29 + offsetY);
+    cv.setCursor(30, 25 + offsetY);
     cv.print(hm_buf);
 
+    /* Seconds subscript on the right of the clock */
     cv.setTextSize(1);
-    char date_str[24];
     if (time_synced) {
-        static const char* days[] = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
-        static const char* months[] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
-        snprintf(date_str, sizeof(date_str), "%s, %d %s",
-            days[timeinfo.tm_wday % 7],
-            timeinfo.tm_mday,
-            months[timeinfo.tm_mon % 12]
-        );
+        char sec_buf[4];
+        snprintf(sec_buf, sizeof(sec_buf), "%02d", timeinfo.tm_sec);
+        cv.setCursor(94, 25 + offsetY);
+        cv.print(sec_buf);
+        cv.setCursor(94, 33 + offsetY);
+        cv.print("s");
     } else {
-        snprintf(date_str, sizeof(date_str), "Syncing NTP...");
+        cv.setCursor(94, 28 + offsetY);
+        cv.print("--");
     }
-    int date_w = strlen(date_str) * 6;
-    int date_x = (OLED_PANEL_WIDTH_PX - date_w) / 2;
-    if (date_x < 0) date_x = 0;
-    cv.setCursor(date_x, 49 + offsetY);
-    cv.print(date_str);
+
+    /* Date line with Day-of-Week Pill */
+    if (time_synced) {
+        static const char* days[] = {"SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"};
+        static const char* months[] = {"JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"};
+
+        cv.fillRoundRect(12, 43 + offsetY, 24, 9, 2, TFT_WHITE);
+        cv.setTextColor(TFT_BLACK, TFT_WHITE);
+        cv.setTextSize(1);
+        cv.setCursor(14, 44 + offsetY);
+        cv.print(days[timeinfo.tm_wday % 7]);
+
+        cv.setTextColor(TFT_WHITE, TFT_BLACK);
+        char date_buf[20];
+        snprintf(date_buf, sizeof(date_buf), "%02d %s %04d", timeinfo.tm_mday, months[timeinfo.tm_mon % 12], timeinfo.tm_year + 1900);
+        cv.setCursor(42, 44 + offsetY);
+        cv.print(date_buf);
+    } else {
+        cv.setTextSize(1);
+        cv.setTextColor(TFT_WHITE, TFT_BLACK);
+        cv.setCursor(24, 44 + offsetY);
+        cv.print("Synchronizing NTP...");
+    }
+
+    /* Dynamic 60-second progress bar track */
+    cv.drawFastHLine(14, 56 + offsetY, 100, TFT_WHITE);
+    int sec_w = time_synced ? ((timeinfo.tm_sec * 100) / 59) : (((int)(animFrame * 25.0f)) % 100);
+    if (sec_w > 100) sec_w = 100;
+    if (sec_w > 0) {
+        cv.drawFastHLine(14, 55 + offsetY, sec_w, TFT_WHITE);
+        cv.drawFastHLine(14, 57 + offsetY, sec_w, TFT_WHITE);
+    }
+    int head_x = 14 + sec_w;
+    if (head_x > 114) head_x = 114;
+    cv.fillCircle(head_x, 56 + offsetY, 2, TFT_WHITE);
 }
 
 void drawClockScreen(float animFrame) {
@@ -79,7 +278,6 @@ void drawClockScreen(float animFrame) {
 
     /* Hybrid top zone: Living companion eyes */
     drawMiniFace(EXPR_IDLE, g_blinkEyeHeight, g_currentOffsetX * 0.35f, g_currentOffsetY * 0.35f, 0.5f);
-    cv.drawFastHLine(6, 25 + burn_y, OLED_PANEL_WIDTH_PX - 12, TFT_WHITE);
 
     /* Hybrid bottom zone: Digital Clock */
     renderClockToCanvas(animFrame, burn_y);
@@ -88,56 +286,54 @@ void drawClockScreen(float animFrame) {
 
 void renderWeatherToCanvas(const WeatherInfo& weather, float animFrame, int offsetY) {
     LGFX_Sprite& cv = *s_ambient_canvas;
-    int code = weather.weather_code;
-    int icx = 22;
-    int icy = 42 + offsetY;
 
-    if (code == 0 || code == 1) {
-        cv.fillCircle(icx, icy, 5, TFT_WHITE);
-        for (int i = 0; i < 6; i++) {
-            float angle = (float)i * (2.0f * (float)M_PI / 6.0f) + animFrame * 0.2f;
-            int x1 = icx + (int)roundf(cosf(angle) * 7.0f);
-            int y1 = icy + (int)roundf(sinf(angle) * 7.0f);
-            int x2 = icx + (int)roundf(cosf(angle) * 10.0f);
-            int y2 = icy + (int)roundf(sinf(angle) * 10.0f);
-            cv.drawLine(x1, y1, x2, y2, TFT_WHITE);
-        }
-    } else if ((code >= 51 && code <= 67) || (code >= 80 && code <= 82)) {
-        cv.fillCircle(icx - 5, icy - 3, 3, TFT_WHITE);
-        cv.fillCircle(icx, icy - 5, 5, TFT_WHITE);
-        cv.fillCircle(icx + 5, icy - 3, 3, TFT_WHITE);
-        cv.fillRect(icx - 8, icy - 3, 16, 4, TFT_WHITE);
-
-        int dropShift = ((int)(animFrame * 6.0f)) % 4;
-        for (int r = -5; r <= 5; r += 5) {
-            int rx = icx + r;
-            int ry = icy + 3 + dropShift;
-            cv.drawLine(rx, ry, rx - 1, ry + 2, TFT_WHITE);
-        }
-    } else if (code >= 95 && code <= 99) {
-        cv.fillCircle(icx - 5, icy - 3, 3, TFT_WHITE);
-        cv.fillCircle(icx, icy - 5, 5, TFT_WHITE);
-        cv.fillCircle(icx + 5, icy - 3, 3, TFT_WHITE);
-        cv.fillRect(icx - 8, icy - 3, 16, 4, TFT_WHITE);
-
-        cv.drawLine(icx, icy + 1, icx - 2, icy + 5, TFT_WHITE);
-        cv.drawLine(icx - 2, icy + 5, icx + 1, icy + 5, TFT_WHITE);
-        cv.drawLine(icx + 1, icy + 5, icx - 1, icy + 9, TFT_WHITE);
-    } else if (code == 45 || code == 48) {
-        cv.drawFastHLine(icx - 9, icy - 3, 18, TFT_WHITE);
-        cv.drawFastHLine(icx - 6, icy, 12, TFT_WHITE);
-        cv.drawFastHLine(icx - 9, icy + 3, 18, TFT_WHITE);
+    /* Top Header: Left city badge */
+    char city_tag[6];
+    if (weather.valid && weather.city[0] != '\0') {
+        city_tag[0] = (char)toupper((unsigned char)weather.city[0]);
+        city_tag[1] = (char)toupper((unsigned char)weather.city[1]);
+        city_tag[2] = (char)toupper((unsigned char)weather.city[2]);
+        city_tag[3] = '\0';
     } else {
-        if (code == 2) {
-            cv.drawCircle(icx + 6, icy - 6, 2, TFT_WHITE);
-        }
-        cv.fillCircle(icx - 5, icy - 2, 4, TFT_WHITE);
-        cv.fillCircle(icx, icy - 5, 6, TFT_WHITE);
-        cv.fillCircle(icx + 5, icy - 2, 4, TFT_WHITE);
-        cv.fillRect(icx - 8, icy - 2, 16, 5, TFT_WHITE);
+        strncpy(city_tag, "LOC", sizeof(city_tag));
     }
+    cv.fillRoundRect(6, 6 + offsetY, 26, 11, 2, TFT_WHITE);
+    cv.setTextColor(TFT_BLACK, TFT_WHITE);
+    cv.setTextSize(1);
+    cv.setCursor(9, 8 + offsetY);
+    cv.print(city_tag);
 
-    char temp_buf[16];
+    /* Top Header: Right weather condition tag */
+    const char* cond_tag = "NORM";
+    if (weather.valid) {
+        int c = weather.weather_code;
+        if (c == 0 || c == 1) cond_tag = "SUN";
+        else if (c == 2 || c == 3) cond_tag = "CLD";
+        else if (c == 45 || c == 48) cond_tag = "FOG";
+        else if (c >= 51 && c <= 67) cond_tag = "RAIN";
+        else if (c >= 71 && c <= 77) cond_tag = "SNOW";
+        else if (c >= 80 && c <= 82) cond_tag = "SHWR";
+        else if (c >= 95) cond_tag = "STRM";
+    }
+    cv.drawRoundRect(96, 6 + offsetY, 26, 11, 2, TFT_WHITE);
+    cv.setTextColor(TFT_WHITE, TFT_BLACK);
+    cv.setTextSize(1);
+    cv.setCursor(100, 8 + offsetY);
+    cv.print(cond_tag);
+
+    /* Separator line framing status header */
+    cv.drawFastHLine(6, 23 + offsetY, OLED_PANEL_WIDTH_PX - 12, TFT_WHITE);
+    cv.drawPixel(6, 22 + offsetY, TFT_WHITE);
+    cv.drawPixel(OLED_PANEL_WIDTH_PX - 7, 22 + offsetY, TFT_WHITE);
+
+    /* Left Column: Animated weather illustration */
+    draw_weather_glyph(cv, weather.weather_code, 20, 42 + offsetY, animFrame);
+
+    /* Vertical divider separating icon from metrics */
+    cv.drawFastVLine(38, 26 + offsetY, 34, TFT_WHITE);
+
+    /* Right Column: Big Temperature */
+    char temp_buf[12];
     if (weather.valid) {
         snprintf(temp_buf, sizeof(temp_buf), "%.1f", weather.temperature);
     } else {
@@ -146,33 +342,52 @@ void renderWeatherToCanvas(const WeatherInfo& weather, float animFrame, int offs
 
     cv.setTextSize(2);
     cv.setTextColor(TFT_WHITE, TFT_BLACK);
-    cv.setCursor(44, 29 + offsetY);
+    cv.setCursor(43, 24 + offsetY);
     cv.print(temp_buf);
-    int deg_x = 44 + strlen(temp_buf) * 12 + 1;
-    cv.drawCircle(deg_x + 2, 30 + offsetY, 1, TFT_WHITE);
+
+    int deg_x = 43 + strlen(temp_buf) * 12 + 2;
+    cv.drawCircle(deg_x + 2, 25 + offsetY, 2, TFT_WHITE);
     cv.setTextSize(1);
-    cv.setCursor(deg_x + 6, 33 + offsetY);
+    cv.setCursor(deg_x + 7, 27 + offsetY);
     cv.print("C");
 
-    char cond_buf[32];
+    /* Right Column: City Name */
+    cv.setTextSize(1);
+    cv.setCursor(43, 42 + offsetY);
+    char city_display[16];
+    if (weather.valid && weather.city[0] != '\0') {
+        strncpy(city_display, weather.city, sizeof(city_display) - 1);
+        city_display[sizeof(city_display) - 1] = '\0';
+    } else {
+        strncpy(city_display, "Weather", sizeof(city_display));
+    }
+    cv.print(city_display);
+
+    /* Right Column: Dual Metric Capsules (Humidity & Sun Times) */
+    cv.drawPixel(45, 53 + offsetY, TFT_WHITE);
+    cv.drawLine(44, 54 + offsetY, 46, 54 + offsetY, TFT_WHITE);
+    cv.fillRect(43, 55 + offsetY, 5, 3, TFT_WHITE);
+    cv.drawPixel(44, 58 + offsetY, TFT_WHITE);
+    cv.drawPixel(46, 58 + offsetY, TFT_WHITE);
+
+    cv.setCursor(51, 53 + offsetY);
     if (weather.valid) {
-        if (weather.sun_times_valid && ((int)animFrame % 4 >= 2)) {
-            snprintf(cond_buf, sizeof(cond_buf), "^%02d:%02d v%02d:%02d",
-                weather.sunrise_hour, weather.sunrise_min,
-                weather.sunset_hour, weather.sunset_min
-            );
+        cv.printf("%d%%", weather.humidity);
+    } else {
+        cv.print("--%");
+    }
+
+    cv.setCursor(84, 53 + offsetY);
+    if (weather.valid && weather.sun_times_valid) {
+        bool show_sunset = ((int)(animFrame * 0.4f) % 2 == 1);
+        if (show_sunset) {
+            cv.printf("v%02d:%02d", weather.sunset_hour, weather.sunset_min);
         } else {
-            snprintf(cond_buf, sizeof(cond_buf), "%s  %d%%",
-                weather.city[0] != '\0' ? weather.city : "Weather",
-                weather.humidity
-            );
+            cv.printf("^%02d:%02d", weather.sunrise_hour, weather.sunrise_min);
         }
     } else {
-        snprintf(cond_buf, sizeof(cond_buf), "Updating...");
+        cv.print("Live");
     }
-    cv.setTextSize(1);
-    cv.setCursor(44, 49 + offsetY);
-    cv.print(cond_buf);
 }
 
 void drawWeatherScreen(const WeatherInfo& weather, float animFrame) {
@@ -182,72 +397,96 @@ void drawWeatherScreen(const WeatherInfo& weather, float animFrame) {
 
     /* Hybrid top zone: Living companion eyes reacting to weather */
     Expression wExpr = EXPR_IDLE;
-    if (weather.valid && weather.weather_code >= 95) {
-        wExpr = EXPR_SHOCK;
+    if (weather.valid) {
+        if (weather.weather_code == 0 || weather.weather_code == 1) {
+            wExpr = EXPR_HAPPY;
+        }
     }
     drawMiniFace(wExpr, g_blinkEyeHeight, g_currentOffsetX * 0.35f, g_currentOffsetY * 0.35f, 0.5f);
-    cv.drawFastHLine(6, 25 + burn_y, OLED_PANEL_WIDTH_PX - 12, TFT_WHITE);
 
     /* Hybrid bottom zone: Weather Forecast */
     renderWeatherToCanvas(weather, animFrame, burn_y);
     cv.pushSprite(0, 0);
 }
 
-void renderNotificationToCanvas(const NotificationInfo& notif, float animFrame, int offsetY) {
-    (void)animFrame;
+void renderNotificationToCanvas(const NotificationInfo& notif, float animFrame, int offsetY, float progress) {
     LGFX_Sprite& cv = *s_ambient_canvas;
+
+    /* Top Header: Inverted solid App badge on left */
+    const char* app_label = "ALERT";
+    const char* app_src = (notif.app[0] != '\0') ? notif.app : notif.title;
+    if (strstr(app_src, "WhatsApp") || strstr(app_src, "WA")) {
+        app_label = "WA";
+    } else if (strstr(app_src, "Telegram") || strstr(app_src, "TG")) {
+        app_label = "TG";
+    } else if (strstr(app_src, "Gmail") || strstr(app_src, "Mail")) {
+        app_label = "MAIL";
+    } else if (strstr(app_src, "SMS") || strstr(app_src, "Pesan")) {
+        app_label = "SMS";
+    } else if (strstr(app_src, "Discord")) {
+        app_label = "DISC";
+    }
+
+    cv.fillRoundRect(4, 6 + offsetY, 34, 11, 2, TFT_WHITE);
+    cv.setTextColor(TFT_BLACK, TFT_WHITE);
     cv.setTextSize(1);
+    cv.setCursor(7, 8 + offsetY);
+    cv.print(app_label);
+
+    /* Top Header: Continuous animated ringing bell beacon on right */
+    draw_attention_bell(cv, 110, 11 + offsetY, animFrame);
+
+    /* Separator line framing status header */
+    cv.drawFastHLine(4, 23 + offsetY, OLED_PANEL_WIDTH_PX - 8, TFT_WHITE);
+    cv.drawPixel(4, 22 + offsetY, TFT_WHITE);
+    cv.drawPixel(OLED_PANEL_WIDTH_PX - 5, 22 + offsetY, TFT_WHITE);
+
+    /* Message Card: Sender / Title Line */
     cv.setTextColor(TFT_WHITE, TFT_BLACK);
+    cv.setTextSize(1);
+    cv.setCursor(4, 25 + offsetY);
 
-    /* Mail badge icon */
-    int ix = 8;
-    int iy = 28 + offsetY;
-    cv.drawRect(ix, iy, 9, 7, TFT_WHITE);
-    cv.drawLine(ix, iy, ix + 4, iy + 3, TFT_WHITE);
-    cv.drawLine(ix + 8, iy, ix + 4, iy + 3, TFT_WHITE);
+    char sender_buf[22];
+    const char* sender = (notif.title[0] != '\0') ? notif.title : notif.app;
+    if (sender[0] != '\0') {
+        snprintf(sender_buf, sizeof(sender_buf), ">> %s", sender);
+    } else {
+        snprintf(sender_buf, sizeof(sender_buf), ">> New Message");
+    }
+    cv.print(sender_buf);
 
-    char header_buf[24];
-    snprintf(header_buf, sizeof(header_buf), "%s", (notif.title[0] != '\0') ? notif.title : notif.app);
-    cv.setCursor(ix + 13, iy);
-    cv.print(header_buf);
+    /* Message Body: Clean word-wrapped lines */
+    char lines[2][22];
+    wrap_notification_text((notif.message[0] != '\0') ? notif.message : "New alert received", lines);
 
-    const char* msg = (notif.message[0] != '\0') ? notif.message : "New alert";
-    size_t len = strlen(msg);
+    cv.setCursor(4, 36 + offsetY);
+    cv.print(lines[0]);
 
-    int line_y = 39 + offsetY;
-    size_t pos = 0;
-    for (int l = 0; l < 2 && pos < len; l++) {
-        char line_buf[22];
-        size_t take = (len - pos > 19) ? 19 : (len - pos);
-        if (take == 19 && pos + take < len && msg[pos + take] != ' ' && msg[pos + take - 1] != ' ') {
-            size_t last_space = 0;
-            for (size_t s = 0; s < take; s++) {
-                if (msg[pos + s] == ' ') last_space = s;
-            }
-            if (last_space > 5) take = last_space;
-        }
-        strncpy(line_buf, msg + pos, take);
-        line_buf[take] = '\0';
-        while (pos + take < len && msg[pos + take] == ' ') take++;
-        pos += take;
+    if (lines[1][0] != '\0') {
+        cv.setCursor(4, 47 + offsetY);
+        cv.print(lines[1]);
+    }
 
-        cv.setCursor(8, line_y);
-        cv.print(line_buf);
-        line_y += 10;
+    /* Bottom Timeout Countdown Progress Bar */
+    int bar_w = (int)(progress * 120.0f);
+    if (bar_w < 0) bar_w = 0;
+    if (bar_w > 120) bar_w = 120;
+    cv.drawRect(4, 59 + offsetY, 120, 3, TFT_WHITE);
+    if (bar_w > 2) {
+        cv.fillRect(5, 60 + offsetY, bar_w - 2, 1, TFT_WHITE);
     }
 }
 
-void drawNotificationScreen(const NotificationInfo& notif, float animFrame) {
+void drawNotificationScreen(const NotificationInfo& notif, float animFrame, float progress) {
     LGFX_Sprite& cv = *s_ambient_canvas;
     cv.fillScreen(TFT_BLACK);
     int burn_y = get_burn_shift_y();
 
-    /* Hybrid top zone: Expressive shocked / alert eyes */
-    drawMiniFace(EXPR_SHOCK, g_blinkEyeHeight, g_currentOffsetX * 0.35f, g_currentOffsetY * 0.35f, 0.5f);
-    cv.drawFastHLine(6, 25 + burn_y, OLED_PANEL_WIDTH_PX - 12, TFT_WHITE);
+    /* Hybrid top zone: Expressive cheerful / alert eyes */
+    drawMiniFace(EXPR_HAPPY, g_blinkEyeHeight, g_currentOffsetX * 0.35f, g_currentOffsetY * 0.35f, 0.5f);
 
-    /* Hybrid bottom zone: Notification contents */
-    renderNotificationToCanvas(notif, animFrame, burn_y);
+    /* Notification contents with high-contrast badge, animated bell, and countdown */
+    renderNotificationToCanvas(notif, animFrame, burn_y, progress);
     cv.pushSprite(0, 0);
 }
 
@@ -495,9 +734,9 @@ void transitionToAmbient(AmbientScreenMode toMode, float durationMs) {
             int offsetY = (int)roundf((1.0f - bounceT) * 38.0f);
 
             cv.fillScreen(TFT_BLACK);
-            Expression miniExpr = (toMode == AMBIENT_NOTIFICATION) ? EXPR_SHOCK : startExpr;
+            Expression miniExpr = (toMode == AMBIENT_NOTIFICATION) ? EXPR_HAPPY : startExpr;
             drawMiniFace(miniExpr, 1.0f, g_currentOffsetX * 0.35f, g_currentOffsetY * 0.35f, 0.5f);
-            cv.drawFastHLine(6, 25 + offsetY, OLED_PANEL_WIDTH_PX - 12, TFT_WHITE);
+            cv.drawFastHLine(6, 23 + offsetY, OLED_PANEL_WIDTH_PX - 12, TFT_WHITE);
 
             if (toMode == AMBIENT_CLOCK) {
                 renderClockToCanvas(g_animFrame, offsetY);
@@ -554,7 +793,7 @@ void transitionFromAmbientToFace(AmbientScreenMode fromMode, Expression toExpr, 
 
             cv.fillScreen(TFT_BLACK);
             drawMiniFace(toExpr, 1.0f, g_currentOffsetX * 0.35f, g_currentOffsetY * 0.35f, 0.5f);
-            cv.drawFastHLine(6, 25 + offsetY, OLED_PANEL_WIDTH_PX - 12, TFT_WHITE);
+            cv.drawFastHLine(6, 23 + offsetY, OLED_PANEL_WIDTH_PX - 12, TFT_WHITE);
 
             if (fromMode == AMBIENT_CLOCK) {
                 renderClockToCanvas(g_animFrame, offsetY);

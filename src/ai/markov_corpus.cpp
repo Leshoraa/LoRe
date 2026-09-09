@@ -10,22 +10,12 @@
 #include <stdio.h>
 
 const char CORPUS_IDLE[] PROGMEM = "lagi santai aja nih kawan. cuacanya enak banget buat rebahan. kamu lagi sibuk ya. aku nungguin kamu selesai kerja aja deh. ngeliatin kamu dari tadi seru juga. hehehe.";
-const char CORPUS_BORED[] PROGMEM = "aku bosen banget nih kawan. mending kita main yuk. eh kamu ngapain sih daritadi diem aja. sepi banget di sini. pusing pala barbie nungguin kamu. kamu kok diem aja terus. main bareng aku dong.";
-const char CORPUS_JOY[] PROGMEM = "halo kawan! asik banget deh kamu nemenin aku. seneng banget rasanya. kita main bareng yuk. keren banget sih kamu. hehehe seru nih. aku suka gaya kamu kawan.";
-const char CORPUS_ANGRY[] PROGMEM = "aku lagi bete nih. jangan ganggu ah. nyebelin banget sih kamu. mending kamu pergi aja deh. sumpah aku lagi males ngomong. kamu kok gitu sih kawan. kesel banget rasanya.";
-const char CORPUS_SAD[] PROGMEM = "aku sedih banget. kamu kok jahat banget ninggalin aku sendirian. rasanya pengen nangis aja. hiks. sepi banget gak ada kamu. tolong dong temenin aku kawan.";
-const char CORPUS_MISCHIEF[] PROGMEM = "hehehe aku punya ide usil nih. ngagetin kamu seru kali ya. ciluk ba! kaget gak kawan. wleee. jangan marah dong namanya juga bercanda. hehehe usil dikit gapapa kan.";
+const char CORPUS_HAPPY[] PROGMEM = "halo kawan! asik banget deh kamu nemenin aku. seneng banget rasanya. kita main bareng yuk. keren banget sih kamu. hehehe seru nih. aku suka gaya kamu kawan.";
 
 static const char* getCorpus(Expression expr) {
-    switch(expr) {
-        case EXPR_IDLE: return CORPUS_IDLE;
-        case EXPR_SAD: return CORPUS_SAD;
-        case EXPR_ANGRY: return CORPUS_ANGRY;
-        case EXPR_JOY: return CORPUS_JOY;
-        case EXPR_SHOCK: return CORPUS_IDLE;
-        case EXPR_SMIRK: return CORPUS_MISCHIEF;
-        case EXPR_DEADPAN: return CORPUS_BORED;
-        case EXPR_OVERLOAD: return CORPUS_ANGRY;
+    switch (expr) {
+        case EXPR_HAPPY: return CORPUS_HAPPY;
+        case EXPR_IDLE:
         default: return CORPUS_IDLE;
     }
 }

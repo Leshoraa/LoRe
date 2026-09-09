@@ -1,6 +1,6 @@
 /**
  * @file wifi_manager.cpp
- * @brief Wi-Fi STA connection, SoftAP fallback, mDNS, NetBIOS, and DNS captive portal implementation.
+ * @brief Wi-Fi STA connection, SoftAP fallback, mDNS, and DNS captive portal implementation.
  */
 
 #include "src/net/wifi_manager.h"
@@ -9,7 +9,6 @@
 #include "src/core/display_engine.h"
 #include <WiFi.h>
 #include <ESPmDNS.h>
-#include <NetBIOS.h>
 #include <DNSServer.h>
 #include <Arduino.h>
 
@@ -81,8 +80,6 @@ bool initWiFiAndNetwork(void) {
             MDNS.addService("http", "tcp", HTTP_PORT_WEB_CONTROL);
         }
 
-        NBNS.begin("lore");
-
         char sta_ip_buf[40];
         snprintf(sta_ip_buf, sizeof(sta_ip_buf), "IP: %s", WiFi.localIP().toString().c_str());
         showBootStatus("WiFi Connected!", sta_ip_buf);
@@ -112,8 +109,6 @@ bool initWiFiAndNetwork(void) {
             MDNS.setInstanceName("LoRe Robot AP");
             MDNS.addService("http", "tcp", HTTP_PORT_WEB_CONTROL);
         }
-
-        NBNS.begin("lore");
 
         s_dnsServer.setErrorReplyCode(DNSReplyCode::NoError);
         s_dnsServer.start(53, "*", WiFi.softAPIP());

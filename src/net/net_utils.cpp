@@ -6,6 +6,7 @@
 #include "src/net/net_utils.h"
 #include <string.h>
 #include <ctype.h>
+#include <stdio.h>
 
 bool extract_json_field(const char* json, const char* key, char* out, size_t max_len) {
     if (!json || !key || !out || max_len == 0) return false;
@@ -65,11 +66,11 @@ void classify_notification_app(const char* title, const char* message, char* out
         strncpy(out_app, "WhatsApp", max_len - 1);
     } else if (strstr(t, "Telegram") || strstr(t, "[TG]") || strstr(m, "Telegram")) {
         strncpy(out_app, "Telegram", max_len - 1);
-    } else if (strstr(t, "Gmail") || strstr(t, "Email")) {
+    } else if (strstr(t, "Gmail") || strstr(t, "Email") || strstr(m, "Gmail") || strstr(m, "Email")) {
         strncpy(out_app, "Gmail", max_len - 1);
-    } else if (strstr(t, "SMS") || strstr(t, "Pesan")) {
+    } else if (strstr(t, "SMS") || strstr(t, "Pesan") || strstr(m, "SMS")) {
         strncpy(out_app, "SMS", max_len - 1);
-    } else if (strstr(t, "Discord")) {
+    } else if (strstr(t, "Discord") || strstr(m, "Discord")) {
         strncpy(out_app, "Discord", max_len - 1);
     } else {
         strncpy(out_app, "Notice", max_len - 1);

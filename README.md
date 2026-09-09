@@ -1,7 +1,7 @@
 # LoRe (*Luminescent Ocular Robotic Engine*)
 
 [![Build Status](https://img.shields.io/badge/Build-Passing-brightgreen.svg)](scripts/build.sh)
-[![Tests](https://img.shields.io/badge/Tests-9%20Passed-brightgreen.svg)](scripts/run_tests.sh)
+[![Tests](https://img.shields.io/badge/Tests-12%20Passed-brightgreen.svg)](scripts/run_tests.sh)
 [![Platform](https://img.shields.io/badge/Hardware-ESP32--S3%20SuperMini-blue.svg)](https://www.espressif.com/)
 [![Display](https://img.shields.io/badge/Display-SSD1306%20OLED%20(128x64)-blueviolet.svg)](https://github.com/lovyan03/LovyanGFX)
 [![Memory](https://img.shields.io/badge/Memory-Internal%20SRAM%20Only-success.svg)](docs/adr/ADR-003-sram-only-memory-budget.md)
@@ -11,9 +11,9 @@
 
 ## 1. Description
 
-> **Autonomous biomechanical ocular synthesis and affective psychology engine for headless robotic companions on the ESP32-S3.**
+> **Autonomous biomechanical ocular synthesis, autonomic brainstem CPG dynamics, and affective psychology engine for headless robotic companions on the ESP32-S3.**
 
-**LoRe** is an asynchronous embedded robotics companion firmware that drives a 0.96" I2C OLED display (SSD1306) at a deterministic **60 FPS**. Engineered specifically for miniature form-factor microcontrollers without camera optics or external PSRAM, LoRe generates fluid, biologically plausible gaze kinetics using Flash & Hogan 5th-order minimum-jerk saccades, 2D Russell Circumplex emotional Langevin diffusion, 5 homeostatic drives, episodic vector memory, ambient information glance HUDs, and dual-band communication (Wi-Fi STA/AP and BLE NUS).
+**LoRe** is an asynchronous embedded robotics companion firmware that drives a 0.96" I2C OLED display (SSD1306) at a deterministic **60 FPS**. Engineered specifically for miniature form-factor microcontrollers without camera optics or external PSRAM, LoRe generates fluid, biologically plausible gaze kinetics using Flash & Hogan 5th-order minimum-jerk saccades, Matsuoka Central Pattern Generator (CPG) autonomic brainstem dynamics, continuous parametric Superellipse soma morphology, 2D Russell Circumplex emotional Langevin diffusion, 5 homeostatic drives, episodic vector memory, ambient information glance HUDs, and dual-band communication (Wi-Fi STA/AP and BLE NUS).
 
 ---
 
@@ -43,8 +43,10 @@
 ## 3. Key Features
 
 - **60 FPS Biomechanical Kinematics**: Flash & Hogan 5th-order minimum-jerk saccade trajectory generation coupled with an underdamped second-order ocular mass-spring-damper system ($\omega_n = 32.0\text{ rad/s}, \zeta = 0.72$).
-- **Rigid 2D Facial Rig (8 Expressions)**: Volume-conserving squash-and-stretch rendering for `IDLE`, `JOY`, `ANGRY`, `SMIRK`, `SHOCK`, `OVERLOAD`, `SAD`, and `DEADPAN`.
-- **Russell Circumplex Affective Engine**: Stochastic Langevin diffusion across valence-arousal emotional state space within a stabilizing quartic potential well.
+- **Continuous Superellipse (Formula Lamé) Soma Morphology**: Real-time 60 FPS parametric ocular rendering ($|x/a|^n + |y/b|^n \le 1$), enabling LoRe to continuously actuate eye width, height, corner curvature exponent, hollow/solid stroke, asymmetric tilt, and physical OLED hardware contrast.
+- **Autonomic Brainstem CPG**: Matsuoka coupled non-linear neural oscillators producing endogenously driven respiration, homeostatic motor strain accumulation/discharge, and spontaneous biological agency.
+- **Physiological Micro-Nystagmus**: Continuous sub-pixel Langevin Brownian fluctuations coupled to ocular motor output for lifelike organic micro-tremor.
+- **Russell Circumplex Affective Engine**: Stochastic Langevin diffusion across valence-arousal emotional state space coupled with autonomic vitality.
 - **On-Device TinyML Micro-Brain**: 5 homeostatic drives (*Curiosity*, *Social*, *Boredom*, *Fatigue*, *Mischief*) coupled to Markov action selection and circadian energy cycles.
 - **Episodic Latent Vector Memory**: 32-entry episodic memory bank with cosine similarity resonance and NVS flash persistence.
 - **Hybrid Ambient Utility Glances**: Living mini-ocular companion header paired with Digital Clock, Open-Meteo Weather forecast with alternating astronomical dawn/dusk indicator (`^05:49 v17:51`), Ntfy.sh Phone Notifications with physical startle reaction, and Turn-by-Turn Navigation HUD.
@@ -84,12 +86,12 @@
 | CORE 1: oledTask (Priority 1, 60 FPS Kinematics & Rendering Loop)               |
 | - 2D Russell Circumplex Affective Engine (Valence-Arousal Langevin Diffusion)   |
 | - On-Device TinyML Micro-Brain (Homeostatic Drives & Markov Action Selection)   |
-| - Unified Rigid 2D Facial Rig (8 Expressions, Eyes, Eyebrows, Mouth)           |
+| - Unified Rigid 2D Facial Rig (2 Expressions: IDLE, HAPPY)                      |
 | - Coordinate Hysteresis Filtering (getFilteredOx, getFilteredOy)                |
 | - Ocular Dynamics (32.0 rad/s Underdamped Mass-Spring-Damper, zeta = 0.72)      |
 | - 5th-Order Minimum-Jerk Saccades (Flash & Hogan Formulation)                   |
 | - Fixation Micro-Kinetics (Mean-Reverting Brownian Random Walk)                 |
-| - Non-Blocking Eyelid State Machine (Idle -> Closing -> Opening -> Blink-Chain) |
+| - Non-Blocking Eyelid State Machine (Idle -> Closing -> Closed Dwell -> Opening -> Blink-Chain / Drowsy Doze)|
 | - OLED Anti-Burn-In Protection (+/-1 px Micro-Shift during Standby)             |
 | - Ambient Screens (Clock, Open-Meteo Weather, Push Notification, Turn-by-Turn)   |
 | - LovyanGFX 1-Bit Monochrome Sprite Renderer (1.0 MHz Fast-Mode Plus I2C Bus)   |
@@ -114,7 +116,7 @@
 | **Core** | `src/core/facial_renderer.h`| 2D facial rig geometry (eyes, mouth, blush) and easing curves |
 | **Core** | `src/core/ambient_screens.h`| Clock, Weather, Notification, and Navigation screen drawing |
 | **Core** | `src/core/gaze_engine.h` | Virtual gaze coordination, stimulus decay & DFS power scaling |
-| **Net** | `src/net/wifi_manager.h` | Wi-Fi STA, SoftAP fallback, mDNS, NetBIOS, DNS captive portal |
+| **Net** | `src/net/wifi_manager.h` | Wi-Fi STA, SoftAP fallback, mDNS, DNS captive portal |
 | **Net** | `src/net/http_server.h` | Port 80 HTTP server, REST control, Web OTA update |
 | **Net** | `src/net/ble_manager.h` | BLE GATT Nordic UART Service (NUS) server |
 | **Net** | `src/net/telemetry_service.h`| Canonical telemetry snapshot JSON serializer |
@@ -245,6 +247,7 @@ bash scripts/run_tests.sh
 - `test_episodic_memory`: Validates 32-slot ring buffer eviction and cosine resonance ranking.
 - `test_brain_inference`: Tests feedforward activation and homeostatic drive saturation.
 - `test_kinematics_feedforward`: Asserts mass-spring-damper settling time and damping ratio bounds.
+- `test_blink_kinematics`: Asserts tri-phase human blink trajectory, asymmetric palpebral closure, and velocity bounds.
 - `test_ble_telemetry`: Verifies JSON telemetry buffer formatting and schema compliance.
 - `test_notification_parser`: Validates JSON string extraction, message wrapping, and app identification.
 

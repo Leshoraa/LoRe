@@ -13,11 +13,11 @@ As the LoRe firmware grew to accommodate complex robotic behaviors—including 6
 ## Decision
 1. **Partition Display Engine into Deep Modules**:
    - `src/core/display_engine`: Serves as the display orchestrator, configuring LovyanGFX I2C bus timing, managing the 60 FPS Core 1 FreeRTOS `oledTask` loop, applying dynamic auto-brightness, and micro-shifting pixels for burn-in mitigation.
-   - `src/core/facial_renderer`: Encapsulates 2D rigid geometry (dual eyes, Fumo eyes, mouth arcs, tears, blush) and expression easing curves.
+   - `src/core/facial_renderer`: Encapsulates organic affective eye deformation, stereoscopic ocular vergence, Duchenne smile softening, and natural expression transition easing.
    - `src/core/ambient_screens`: Encapsulates Clock, Weather forecast, Mobile Notification popup, and Navigation HUD turn-by-turn vector screens.
 2. **Centralize Persistent Configuration (`device_config`)**:
    - Create `src/config/device_config` as the single source of truth for `lore_cfg` NVS storage (credentials, BLE advertised name, OLED brightness, weather coordinates, and timezone offset).
-   - Constrain `src/net/wifi_manager` strictly to Wi-Fi STA connection, SoftAP fallback, mDNS, NetBIOS, and DNS captive portal.
+    - Constrain `src/net/wifi_manager` strictly to Wi-Fi STA connection, SoftAP fallback, mDNS, and DNS captive portal.
 3. **Extract Shared Network Utilities & Telemetry**:
    - Create `src/net/net_utils` to centralize JSON string extraction, text wrapping, and notification application classification.
    - Create `src/net/telemetry_service` to provide a single, unified telemetry JSON serializer shared by BLE NUS and HTTP `/telemetry`.
@@ -36,6 +36,6 @@ As the LoRe firmware grew to accommodate complex robotic behaviors—including 6
   - Elimination of duplicate logic across communication channels.
   - Zero dead camera variables or unreferenced stubs.
   - Dynamic memory footprint remains lean at 56,936 bytes (17% of internal SRAM), leaving >270 KB headroom for FreeRTOS task stacks.
-  - All 9 host unit tests pass with zero regressions.
+  - All 10 host unit tests pass with zero regressions.
 - **Negative**:
   - Requires updating build scripts and header includes to reference modular directory paths.

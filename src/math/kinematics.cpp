@@ -5,6 +5,8 @@
 
 #include "src/math/kinematics.h"
 #include "src/ai/personality_engine.h"
+#include "src/ai/brain_engine.h"
+#include "src/math/affective_engine.h"
 #include "src/config/lore_config.h"
 #include "src/types/lore_types.h"
 #include <math.h>
@@ -115,16 +117,25 @@ void compute_squash_stretch_factors(float progress, float arousal, float* scaleX
 }
 
 float blinkCloseEase(float t) {
-    return 1.0f - (t * t);
+    if (t <= 0.0f) return 1.0f;
+    if (t >= 1.0f) return 0.0f;
+    /* Human orbicularis oculi fast-twitch down-phase:
+     * Rapid acceleration with peak downward velocity around tau = 0.38 - 0.40,
+     * followed by smooth deceleration settling into palpebral contact without hard impact. */
+    float u = powf(t, 0.85f);
+    float s = u * u * u * (10.0f + u * (-15.0f + 6.0f * u));
+    return constrain(1.0f - s, 0.0f, 1.0f);
 }
 
 float blinkOpenEase(float t) {
     if (t <= 0.0f) return 0.0f;
     if (t >= 1.0f) return 1.0f;
-    /* Fast-twitch muscular pop with 5.5% elastic overshoot */
+    /* Human levator palpebrae superioris viscoelastic up-phase:
+     * Smooth ease-out retraction against tissue resistance with subtle
+     * 3.5% myogenic settling near resting palpebral aperture. */
     float base = sinf(t * 1.5707963f);
-    float pop = 0.055f * sinf(t * 3.14159265f) * expf(-3.8f * t);
-    return constrain(base + pop, 0.0f, 1.08f);
+    float settling = 0.035f * sinf(t * 3.14159265f) * expf(-2.5f * (1.0f - t));
+    return constrain(base + settling, 0.0f, 1.04f);
 }
 
 float customLerp(float a, float b, float t) {
@@ -164,8 +175,39 @@ void updateGazeSystem(void) {
     if (dt > 0.040f) dt = 0.040f;
     lastGazeTimeUs = nowUs;
 
+    bool targetActive = (g_recon_state == STATE_ACTIVE) && (target.detected || ((now - target.last_seen_ms) < 300 && target.last_seen_ms > 0));
+
+    /* Continuous Stereoscopic Ocular Vergence (3D Depth Focus) */
+    float targetVergence = 0.0f;
+    if (targetActive && target.proximity > 0.05f) {
+        targetVergence = constrain(target.proximity * 3.2f, 0.0f, 3.5f);
+    }
+    float alpha_v = 1.0f - expf(-10.0f * dt);
+    g_currentVergence += (targetVergence - g_currentVergence) * alpha_v;
+    if (fabsf(g_currentVergence) < 0.02f) {
+        g_currentVergence = 0.0f;
+    }
+
+    /* Volume-Conserving Biological Tissue Squash & Stretch */
+    float arousal = getEmotionArousal();
+    float sleep_pressure = getBiologicalSleepPressure();
+    float targetScaleY = 1.0f + (0.15f * (arousal - 0.20f) - 0.08f * sleep_pressure);
+    targetScaleY = constrain(targetScaleY, 0.88f, 1.18f);
+    float targetScaleX = 1.0f / sqrtf(targetScaleY);
+
+    float alpha_s = 1.0f - expf(-8.0f * dt);
+    g_currentEyeScaleY += (targetScaleY - g_currentEyeScaleY) * alpha_s;
+    g_currentEyeScaleX += (targetScaleX - g_currentEyeScaleX) * alpha_s;
+
+    if (fabsf(g_currentEyeScaleY - 1.0f) < 0.005f) {
+        g_currentEyeScaleY = 1.0f;
+    }
+    if (fabsf(g_currentEyeScaleX - 1.0f) < 0.005f) {
+        g_currentEyeScaleX = 1.0f;
+    }
+    g_currentEyeScale = g_currentEyeScaleY;
+
     if (g_is_transitioning) {
-        bool targetActive = (g_recon_state == STATE_ACTIVE) && (target.detected || ((now - target.last_seen_ms) < 300 && target.last_seen_ms > 0));
         if (targetActive) {
             float normX = constrain((target.error_x / 100.0f) * GAZE_GAIN_X, -1.0f, 1.0f);
             float normY = constrain((target.error_y / 100.0f) * GAZE_GAIN_Y, -1.0f, 1.0f);
@@ -199,7 +241,7 @@ void updateGazeSystem(void) {
         return;
     }
 
-    bool targetActive = (g_recon_state == STATE_ACTIVE) && target.detected;
+    targetActive = (g_recon_state == STATE_ACTIVE) && target.detected;
     if (targetActive) {
         float normX = constrain((target.error_x / 100.0f) * GAZE_GAIN_X, -1.0f, 1.0f);
         float normY = constrain((target.error_y / 100.0f) * GAZE_GAIN_Y, -1.0f, 1.0f);
@@ -249,9 +291,6 @@ void updateGazeSystem(void) {
         float alpha = 1.0f - expf(-20.0f * dt);
         s_smoothedTargetX += (effectiveTargetX - s_smoothedTargetX) * alpha;
         s_smoothedTargetY += (effectiveTargetY - s_smoothedTargetY) * alpha;
-
-        g_currentVergence = 0.0f;
-        g_currentEyeScale = 1.0f;
 
         float dx_eye = effectiveTargetX - g_currentOffsetX;
         float dy_eye = effectiveTargetY - g_currentOffsetY;
@@ -326,10 +365,6 @@ void updateGazeSystem(void) {
         s_eye_vy = 0.0f;
         s_nextGazeTime = now + (uint32_t)(esp_random() % 1500 + 2500);
     }
-
-    float alpha_decay = 1.0f - expf(-8.0f * dt);
-    g_currentVergence += (0.0f - g_currentVergence) * alpha_decay;
-    g_currentEyeScale += (1.0f - g_currentEyeScale) * alpha_decay;
 
     bool isSleep = (g_recon_state == STATE_SLEEP_RECON);
     float y_bias = getPersonalityIdleGazeYBias();
@@ -445,3 +480,16 @@ void updateGazeSystem(void) {
     g_currentOffsetX = constrain(g_currentOffsetX, -17.5f, 17.5f);
     g_currentOffsetY = constrain(g_currentOffsetY, -12.0f, 11.0f);
 }
+
+float getAffectiveEyeScaleX(void) {
+    return g_currentEyeScaleX;
+}
+
+float getAffectiveEyeScaleY(void) {
+    return g_currentEyeScaleY;
+}
+
+float getOcularVergence(void) {
+    return g_currentVergence;
+}
+

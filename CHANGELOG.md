@@ -2,6 +2,39 @@
 
 All notable changes to the LoRe firmware project will be documented in this file.
 
+## [1.2.0] - 2026-09-09
+
+### Added
+- Organic Affective Eye Deformation & Tissue Conservation: biological incompressibility model ($S_x = 1 / \sqrt{S_y}$) driven continuously by emotional arousal ($A_t$) and sleep pressure ($P_{\text{sleep}}$), organically scaling eye width and height without rigid geometry.
+- Stereoscopic Ocular Vergence (3D Depth Focus): medial rectus convergence shifting eyes inward by up to $3.5\text{ px}$ based on target proximity ($v \in [0.0, 3.5]\text{ px}$).
+- Duchenne Smile Softening: continuous lower eyelid elevation ($d_{\text{duchenne}} \in [0, 3]\text{ px}$) driven by positive emotional valence ($V_t > 0.20$), softening into an organic smiling crescent before transitioning to full happy expression.
+- Split-eye independent bitmap rendering for `EXPR_HAPPY` (`FACE_HAPPY_EYE_LEFT_BITS`, `FACE_HAPPY_EYE_RIGHT_BITS`) to support stereoscopic vergence.
+- Borbély's Two-Process Biological Sleep Regulation Model in `brain_engine`: integrates Circadian Process C ($D_{\text{circadian}}$), Homeostatic Sleep Debt Process S (`fatigue` + `boredom`), and sympathetic affective arousal inhibition into a continuous sleep pressure metric ($P_{\text{sleep}}$).
+- Dynamic micro-sleep doze duration ($t_{\text{doze}} \in [800\text{ ms}, 2200\text{ ms}]$) scaled continuously by physiological sleep debt.
+- Stochastic micro-sleep decision policy (`sampleMicroSleepDecision`) owned by the cognitive AI layer.
+- Unit test coverage for Borbély Two-Process dynamics, ocular vergence, and volume-conserving tissue deformation in `test_brain_inference.cpp` and `test_kinematics_feedforward.cpp`.
+
+### Refactored
+- De-hardcoded display & facial renderer layers: replaced rigid static bitmaps and discarded parameters (`(void)vergence; (void)scale;`) with continuous affective deformation while preserving 100% bit-exact reproduction when in baseline resting state ($S = 1.0, v = 0, h \ge 0.99$).
+- Eliminated static `1500.0f` ms timers, hardcoded probability thresholds, and wall-clock checks from `display_engine.cpp`, delegating all behavioral sleep regulation to `brain_engine` in accordance with `AI_RULES.md` (Rule 46 & Rule 47).
+- Continuous biological resting aperture scaling ($h_{\text{idle}} = 1.0 - 0.08 \cdot P_{\text{sleep}}$) and biomechanical head nod offset ($+2.0\text{ px}$ to $+3.5\text{ px}$) during dozing.
+
+## [1.1.0] - 2026-09-08
+
+### Added
+- Non-blocking 4-phase human eye blink state machine (`BLINK_IDLE_STATE`, `BLINK_CLOSING_STATE`, `BLINK_CLOSED_STATE`, `BLINK_OPENING_STATE`).
+- Biomechanically calibrated human blink easing curves (`blinkCloseEase`, `blinkOpenEase`) matching *orbicularis oculi* and *levator palpebrae* physiology.
+- Asymmetric palpebral displacement law with upper-eyelid dominance ($80\%$ downward early lead) and dynamic stadium corner radius ($r \in [1, 5]$).
+- Circadian drowsiness integration: natural heavy-lidded resting aperture ($h \approx 0.92$), languid blinks, and periodic 1.5s peaceful micro-sleep dozes during late evening (23:00–01:00).
+- High-precision microsecond frame pacing (`delayMicroseconds` + `taskYIELD()`) on Core 1 eliminating FreeRTOS tick jitter and enforcing rock-solid 60.0 FPS.
+- New host unit test module `test_blink_kinematics.cpp` integrated into `scripts/run_tests.sh` (10 tests total).
+
+### Fixed
+- Fatal lwIP assertion crash (`assert failed: udp_new_ip_type ... Required to lock TCPIP core functionality!`) by removing obsolete NetBIOS (`AsyncUDP`) and delegating strictly to thread-safe mDNS.
+- Increased `ntfyTask` initial connection delay to 6.0 seconds to allow Wi-Fi association, DHCP, and initial SNTP time sync to settle before opening persistent streaming sockets.
+- Removed unwanted 2x2 debug white pixel indicator (`drawActiveIndicator`) from top-right corner of OLED display canvas.
+- Corrected deep sleep activation check (`s_oled_wake_temporary_until_ms`) so device smoothly enters low-power sleep (OLED off, CPU 80 MHz) between 01:00 and 05:30, waking automatically at sunrise / 05:30.
+
 ## [1.0.0] - 2026-09-08
 
 ### Added

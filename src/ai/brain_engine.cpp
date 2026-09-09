@@ -42,40 +42,22 @@ static uint32_t s_total_interaction_sec = 0;
 static uint32_t s_total_solitude_sec = 0;
 static uint32_t s_last_update_ms = 0;
 
-static float s_decision_logits[8] = {0};
-static float s_decision_probs[8] = {0};
+static float s_decision_logits[NUM_EXPRESSIONS] = {0};
+static float s_decision_probs[NUM_EXPRESSIONS] = {0};
 static Expression s_dominant_expr = EXPR_IDLE;
 static char s_thought_summary[48] = "Booting cognitive engine...";
 
-/* 8x8 Neural Weight Matrix: Maps [V, A, Cur, Soc, Bor, Fat, Mis, Prox] -> 8 Expressions */
-static const float s_neural_weights[8][8] = {
+/* 2x8 Neural Weight Matrix: Maps [V, A, Cur, Soc, Bor, Fat, Mis, Prox] -> 2 Expressions */
+static const float s_neural_weights[NUM_EXPRESSIONS][8] = {
     /* IDLE: Dominant calm resting baseline */
-    {  0.1f, -0.5f,  0.1f,  0.3f, -1.0f, -0.4f, -0.2f,  0.1f },
-    /* JOY: High Valence, High Social, High Proximity */
-    {  1.8f,  0.6f,  0.3f,  1.3f, -1.0f, -0.5f,  0.2f,  0.6f },
-    /* ANGRY: Tsundere pout (Low Valence, High Arousal, High Mischief) */
-    { -1.5f,  1.1f,  0.1f, -0.5f, -0.2f,  0.4f,  1.4f,  0.4f },
-    /* SMIRK: Playful mischief, moderate positive valence, social */
-    {  0.7f,  0.3f,  0.6f,  0.8f, -0.4f, -0.3f,  1.8f,  0.4f },
-    /* SHOCK: Intense startle reaction on sudden high-arousal spikes */
-    { -0.4f,  1.6f,  0.8f, -0.2f, -0.6f,  0.2f,  0.1f,  1.2f },
-    /* OVERLOAD: High Fatigue, High Arousal, Rapid motion */
-    { -0.9f,  1.4f,  0.2f, -0.3f, -0.5f,  2.5f, -0.4f,  0.3f },
-    /* SAD: Low Social, High Solitude, Negative Valence, Low Arousal */
-    { -1.8f, -0.8f, -0.5f, -2.0f,  0.9f,  0.2f, -0.6f, -0.6f },
-    /* DEADPAN: High Boredom, Low Arousal, Low Motion */
-    { -0.2f, -1.2f, -0.8f, -0.5f,  2.4f,  0.4f,  0.1f, -0.3f }
+    {  0.1f, -0.4f,  0.1f,  0.2f,  0.3f, -0.2f, -0.2f,  0.1f },
+    /* HAPPY: High Valence, High Social, High Proximity, High Bonding */
+    {  1.8f,  0.5f,  0.3f,  1.4f, -0.8f, -0.4f,  0.4f,  0.6f }
 };
 
-static const float s_neural_biases[8] = {
-    1.40f,  /* IDLE bias */
-   -0.70f,  /* JOY bias */
-   -1.20f,  /* ANGRY bias */
-   -0.70f,  /* SMIRK bias */
-   -2.60f,  /* SHOCK bias */
-   -1.80f,  /* OVERLOAD bias */
-   -0.80f,  /* SAD bias */
-   -0.30f   /* DEADPAN bias */
+static const float s_neural_biases[NUM_EXPRESSIONS] = {
+    1.20f,  /* IDLE bias */
+   -0.50f   /* HAPPY bias */
 };
 
 void loadBrainMemoryNVS(void) {
@@ -174,14 +156,14 @@ void updateBrainEngine(float dt_sec) {
             s_bonding_level = fminf(1.0f, s_bonding_level + (float)delta_s * 0.000011f);
         }
 
-        /* Salient Memory Ingestion: Joyful bonding milestone */
-        if (s_dominant_expr == EXPR_JOY && s_bonding_level > 0.30f && s_total_interaction_sec > 25) {
+        /* Salient Memory Ingestion: Happy bonding milestone */
+        if (s_dominant_expr == EXPR_HAPPY && s_bonding_level > 0.30f && s_total_interaction_sec > 25) {
             if (now_s - s_last_joy_mem_s > 60) {
                 s_last_joy_mem_s = now_s;
                 float v_now = getEmotionValence();
                 float a_now = getEmotionArousal();
                 float mem_v[8] = { v_now, a_now, s_drives.curiosity, s_drives.social, s_drives.boredom, s_drives.fatigue, s_drives.mischief, s_proximity_smooth };
-                recordEpisodicMemory(mem_v, EXPR_JOY, 0.75f + 0.20f * s_bonding_level, v_now);
+                recordEpisodicMemory(mem_v, EXPR_HAPPY, 0.75f + 0.20f * s_bonding_level, v_now);
             }
         }
     } else {
@@ -206,7 +188,7 @@ void updateBrainEngine(float dt_sec) {
             float v_now = getEmotionValence();
             float a_now = getEmotionArousal();
             float mem_v[8] = { v_now, a_now, s_drives.curiosity, s_drives.social, s_drives.boredom, s_drives.fatigue, s_drives.mischief, s_proximity_smooth };
-            Expression sol_expr = (s_drives.social < 0.30f) ? EXPR_SAD : EXPR_DEADPAN;
+            Expression sol_expr = EXPR_IDLE;
             recordEpisodicMemory(mem_v, sol_expr, 0.60f, v_now);
         }
     }
@@ -238,13 +220,13 @@ void updateBrainEngine(float dt_sec) {
     float d_mischief = (mischief_gain * (s_drives.social * (1.0f - s_drives.fatigue)) - 0.08f * s_drives.mischief + noise_m);
     s_drives.mischief = constrain(s_drives.mischief + d_mischief * dt_sec, 0.0f, 1.0f);
 
-    /* Salient Memory Ingestion: Sudden High-Arousal Startle / Overload event */
+    /* Salient Memory Ingestion: Sudden High-Arousal event */
     float V = getEmotionValence();
     float A = getEmotionArousal();
     if (A > 0.82f && s_motion_energy_ema > 0.75f && (now_s - s_last_shock_mem_s > 20)) {
         s_last_shock_mem_s = now_s;
         float mem_v[8] = { V, A, s_drives.curiosity, s_drives.social, s_drives.boredom, s_drives.fatigue, s_drives.mischief, s_proximity_smooth };
-        Expression spike_expr = (s_drives.fatigue > 0.60f) ? EXPR_OVERLOAD : EXPR_SHOCK;
+        Expression spike_expr = EXPR_HAPPY;
         recordEpisodicMemory(mem_v, spike_expr, 0.85f, V);
     }
 
@@ -263,16 +245,15 @@ void updateBrainEngine(float dt_sec) {
     EpisodicRecallResult recall = queryMemoryResonance(state_vector);
 
     float max_logit = -999.0f;
-    for (int i = 0; i < 8; i++) {
+    for (int i = 0; i < NUM_EXPRESSIONS; i++) {
         float sum = s_neural_biases[i];
         for (int j = 0; j < 8; j++) {
             sum += s_neural_weights[i][j] * state_vector[j];
         }
 
-        if (i == 1) sum += 0.8f * s_bonding_level;
-        else if (i == 3) sum += 0.6f * s_bonding_level;
-        else if (i == 4) sum -= 1.2f * s_bonding_level;
-        else if (i == 2) sum -= 0.6f * s_bonding_level;
+        if (i == EXPR_HAPPY) {
+            sum += 0.8f * s_bonding_level;
+        }
 
         sum += recall.memory_logits_delta[i];
 
@@ -282,12 +263,12 @@ void updateBrainEngine(float dt_sec) {
 
     float tau = 0.85f;
     float sum_exp = 0.0f;
-    for (int i = 0; i < 8; i++) {
+    for (int i = 0; i < NUM_EXPRESSIONS; i++) {
         s_decision_probs[i] = expf((s_decision_logits[i] - max_logit) / tau);
         sum_exp += s_decision_probs[i];
     }
     float best_prob = -1.0f;
-    for (int i = 0; i < 8; i++) {
+    for (int i = 0; i < NUM_EXPRESSIONS; i++) {
         s_decision_probs[i] /= sum_exp;
         if (s_decision_probs[i] > best_prob) {
             best_prob = s_decision_probs[i];
@@ -362,9 +343,9 @@ void updateBrainEngine(float dt_sec) {
 Expression sampleBrainExpressionPolicy(void) {
     float r = (float)(esp_random() % 10000) / 10000.0f;
     float cum = 0.0f;
-    for (int i = 0; i < 8; i++) {
+    for (int i = 0; i < NUM_EXPRESSIONS; i++) {
         cum += s_decision_probs[i];
-        if (r <= cum || i == 7) {
+        if (r <= cum || i == NUM_EXPRESSIONS - 1) {
             return (Expression)i;
         }
     }
@@ -392,4 +373,37 @@ BrainTelemetry getBrainTelemetry(void) {
 
 const char* getBrainThoughtSummary(void) {
     return s_thought_summary;
+}
+
+float getBiologicalSleepPressure(void) {
+    float circadian_drowsiness = getCircadianDrowsiness();
+    float arousal = getEmotionArousal();
+
+    /* Borbély Two-Process Model:
+     * Process C (Circadian clock drive) + Process S (Homeostatic sleep debt: fatigue + boredom)
+     * dampened by sympathetic nervous system arousal */
+    float raw_pressure = (0.55f * circadian_drowsiness)
+                       + (0.45f * s_drives.fatigue)
+                       + (0.25f * s_drives.boredom)
+                       - (0.40f * arousal);
+
+    return constrain(raw_pressure, 0.0f, 1.0f);
+}
+
+bool sampleMicroSleepDecision(void) {
+    float pressure = getBiologicalSleepPressure();
+    if (pressure < 0.25f) return false;
+
+    float arousal = getEmotionArousal();
+    /* Probability of falling into brief micro-sleep doze during eyelid closure */
+    float p_doze = constrain(0.60f * pressure - 0.20f * arousal, 0.0f, 0.65f);
+    float roll = (float)(esp_random() % 1000) / 1000.0f;
+    return (roll < p_doze);
+}
+
+float getBiologicalDozeDurationMs(void) {
+    float pressure = getBiologicalSleepPressure();
+    /* Biological doze duration scales dynamically with sleep debt:
+     * 800 ms (light microsleep) up to 2200 ms (heavy exhaustion doze) */
+    return 800.0f + 1400.0f * pressure;
 }

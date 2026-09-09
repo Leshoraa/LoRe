@@ -30,7 +30,7 @@ typedef struct {
 typedef struct {
     float resonance_score;              /* Top cosine similarity score [0.0, 1.0] */
     Expression dominant_memory_expr;    /* Expression of the most resonant memory */
-    float memory_logits_delta[8];       /* Additive logit bias vector across 8 expressions */
+    float memory_logits_delta[NUM_EXPRESSIONS];       /* Additive logit bias vector across expressions */
     char recall_context[48];            /* Semantic descriptive context for monologue */
     uint8_t top_k_count;                /* Number of resonant memories contributing to bias */
 } EpisodicRecallResult;

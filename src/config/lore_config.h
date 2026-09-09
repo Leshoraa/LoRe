@@ -147,6 +147,15 @@ extern "C" {
 #define AFFECTIVE_TAU_VALENCE_S         6.0f     /* Langevin valence relaxation constant */
 #define AFFECTIVE_TAU_AROUSAL_S         4.5f     /* Langevin arousal relaxation constant */
 
+/* Autonomous Ocular Soma & Morphology Parameters (Lamé Superellipse) */
+#define SOMA_CANONICAL_EYE_WIDTH_PX     32.0f    /* Baseline horizontal ocular dimension */
+#define SOMA_CANONICAL_EYE_HEIGHT_PX    30.0f    /* Baseline vertical ocular dimension */
+#define SOMA_CANONICAL_SQUIRCLE_N       4.2f     /* Signature squircle curvature exponent */
+#define SOMA_CANONICAL_STROKE_WIDTH     0.0f     /* 0.0f = solid filled, >0.0f = perimeter outline */
+#define SOMA_CANONICAL_LEFT_X           40.0f    /* Primary left eye orbital center X */
+#define SOMA_CANONICAL_RIGHT_X          88.0f    /* Primary right eye orbital center X */
+#define SOMA_CANONICAL_CENTER_Y         32.0f    /* Primary orbital center Y */
+
 /* Network Web Server Port */
 #define HTTP_PORT_WEB_CONTROL           80
 

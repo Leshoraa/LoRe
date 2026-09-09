@@ -13,6 +13,8 @@
 #include "src/math/kinematics.h"
 #include "src/math/affective_engine.h"
 #include "src/ai/personality_engine.h"
+#include "src/ai/brain_engine.h"
+#include "src/ai/autonomic_engine.h"
 #include <Arduino.h>
 #include <esp_random.h>
 #include <time.h>
@@ -41,19 +43,12 @@ static volatile uint32_t s_pending_ambient_duration = 0;
 /* OLED Deep Sleep Anti-Burn-In State */
 static bool s_is_oled_sleeping = false;
 static uint32_t s_oled_wake_temporary_until_ms = 0;
+static bool s_is_drowsy_doze = false;
 
 /* Notification Physical Startle Sequence */
 static volatile bool s_notif_startle_active = false;
 static volatile uint32_t s_notif_startle_start_ms = 0;
 static volatile uint32_t s_staged_notif_duration = NOTIFICATION_POPUP_DURATION_MS;
-
-/* Sleep Mode Substate Machine */
-enum SleepSubState {
-    SLEEP_SUBSTATE_DOZING = 0,
-    SLEEP_SUBSTATE_MICRO_WAKE
-};
-static SleepSubState s_sleep_substate = SLEEP_SUBSTATE_DOZING;
-static uint32_t s_sleep_substate_timer_ms = 0;
 
 int get_burn_shift_x(void) {
     return s_burn_shift_x;
@@ -158,11 +153,11 @@ void triggerWeatherDisplay(uint32_t duration_ms) {
 void triggerNotificationDisplay(const NotificationInfo& notif, uint32_t duration_ms) {
     (void)notif;
     wakeOledFromDeepSleep(duration_ms + 2500);
-    /* Natural physical startle reaction on full facial rig before revealing banner */
+    /* High-attention physical startle reaction on full facial rig before revealing banner */
     s_staged_notif_duration = duration_ms;
     s_notif_startle_start_ms = millis();
     s_notif_startle_active = true;
-    setVirtualTarget(-0.35f, 0.70f, 650.0f);
+    setVirtualTarget(0.0f, 0.40f, 750.0f);
 }
 
 void triggerNavigationDisplay(const NavigationInfo& nav, uint32_t duration_ms) {
@@ -204,6 +199,10 @@ void oledTask(void* pvParameters) {
         uint32_t frame_start_us = micros();
         unsigned long now = millis();
 
+        /* Advance biological autonomic brainstem dynamics (CPG + metabolic homeostasis) */
+        updateAutonomicEngine(0.0166f);
+        OcularSomaState current_soma = getOcularSomaState();
+
         static uint32_t s_last_auto_bright_check_ms = 0;
         if (g_auto_brightness_enabled) {
             if (now - s_last_auto_bright_check_ms > 250) {
@@ -217,9 +216,12 @@ void oledTask(void* pvParameters) {
                 }
             }
         } else {
-            if (s_last_applied_brightness != g_oled_brightness) {
-                s_last_applied_brightness = g_oled_brightness;
-                lcd.setBrightness(g_oled_brightness);
+            /* Autonomous living organism controls its own physical OLED hardware contrast */
+            uint8_t autonomic_target = current_soma.hardware_contrast;
+            if (abs((int)s_last_applied_brightness - (int)autonomic_target) > 2) {
+                s_last_applied_brightness = autonomic_target;
+                g_oled_brightness = autonomic_target;
+                lcd.setBrightness(autonomic_target);
             }
         }
 
@@ -241,8 +243,8 @@ void oledTask(void* pvParameters) {
                           && (now - g_current_target.last_seen_ms < 600));
         portEXIT_CRITICAL(&g_target_mutex);
 
-        if (g_recon_state == STATE_ACTIVE || (now - g_last_web_activity_ms < 10000)) {
-            s_oled_wake_temporary_until_ms = now + 10000;
+        if (g_last_web_activity_ms > 0 && (now - g_last_web_activity_ms < OLED_DEEP_SLEEP_WAKE_TIMEOUT_MS)) {
+            s_oled_wake_temporary_until_ms = g_last_web_activity_ms + OLED_DEEP_SLEEP_WAKE_TIMEOUT_MS;
         }
 
         bool deep_sleep_active = is_oled_deep_sleep_enabled()
@@ -254,17 +256,16 @@ void oledTask(void* pvParameters) {
 
         if (deep_sleep_active) {
             if (!s_is_oled_sleeping) {
-                /* Smooth eyelid closure ease to avoid abrupt cut */
-                for (float t = 1.0f; t >= 0.0f; t -= 0.25f) {
-                    canvas.fillScreen(0);
-                    drawFace(EXPR_IDLE, blinkCloseEase(t), 0.0f, 0.0f, 0.0f, 0.0f, 1.0f);
-                    canvas.pushSprite(0, 0);
-                    vTaskDelay(pdMS_TO_TICKS(15));
+                /* Smooth eyelid closure ease down to peaceful sleep slit */
+                for (float h = 1.0f; h >= 0.0f; h -= 0.15f) {
+                    drawFace(EXPR_IDLE, h, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f);
+                    vTaskDelay(pdMS_TO_TICKS(18));
                 }
                 canvas.fillScreen(0);
                 canvas.pushSprite(0, 0);
                 lcd.sleep();
                 s_is_oled_sleeping = true;
+                g_recon_state = STATE_SLEEP_RECON;
                 setCpuFrequencyMhz(CPU_FREQ_SLEEP_MHZ);
             }
 
@@ -274,31 +275,42 @@ void oledTask(void* pvParameters) {
         }
 
         if (s_is_oled_sleeping) {
+            setCpuFrequencyMhz(CPU_FREQ_ACTIVE_MHZ);
+            g_recon_state = STATE_ACTIVE;
             lcd.wakeup();
             s_is_oled_sleeping = false;
             lcd.setBrightness(g_oled_brightness);
             canvas.fillScreen(0);
             drawFace(EXPR_IDLE, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f);
-            canvas.pushSprite(0, 0);
             g_blinkState = BLINK_OPENING_STATE;
             g_nextBlinkTime = now;
         }
 
-        /* Natural Physical Startle Sequence on Notification */
+        /* Natural Physical Startle Sequence and High-Attention Sensory Strobe */
         if (s_notif_startle_active) {
             uint32_t startle_elapsed = now - s_notif_startle_start_ms;
-            if (startle_elapsed < 650) {
-                g_currentExpr = EXPR_SHOCK;
-                if (startle_elapsed < 130) {
-                    g_blinkEyeHeight = 1.0f;
-                } else if (startle_elapsed < 240) {
-                    g_blinkEyeHeight = 0.0f; /* Rapid alert blink 1 */
-                } else if (startle_elapsed < 350) {
-                    g_blinkEyeHeight = 1.0f;
-                } else if (startle_elapsed < 460) {
-                    g_blinkEyeHeight = 0.0f; /* Rapid alert blink 2 */
+            if (startle_elapsed < 750) {
+                /* Peripheral vision alert strobe: 2 rapid high-contrast white flashes */
+                bool strobe_invert = (startle_elapsed < 45) || (startle_elapsed >= 180 && startle_elapsed < 225);
+                if (strobe_invert) {
+                    canvas.fillScreen(TFT_WHITE);
+                    canvas.drawRect(2, 2, OLED_PANEL_WIDTH_PX - 4, OLED_PANEL_HEIGHT_PX - 4, TFT_BLACK);
+                    canvas.pushSprite(0, 0);
                 } else {
-                    g_blinkEyeHeight = 1.0f;
+                    g_currentExpr = EXPR_HAPPY;
+                    g_currentVergence = 0.5f;
+                    if (startle_elapsed < 140) {
+                        g_blinkEyeHeight = 1.0f;
+                    } else if (startle_elapsed < 240) {
+                        g_blinkEyeHeight = 0.0f; /* Rapid alert blink 1 */
+                    } else if (startle_elapsed < 380) {
+                        g_blinkEyeHeight = 1.0f;
+                    } else if (startle_elapsed < 480) {
+                        g_blinkEyeHeight = 0.0f; /* Rapid alert blink 2 */
+                    } else {
+                        g_blinkEyeHeight = 1.0f;
+                    }
+                    drawFace(EXPR_HAPPY, g_blinkEyeHeight, g_currentOffsetX, g_currentOffsetY, 0.0f, g_currentVergence, g_currentEyeScale);
                 }
             } else {
                 s_notif_startle_active = false;
@@ -329,8 +341,7 @@ void oledTask(void* pvParameters) {
         bool can_spontaneous_glance = !isManualExpressionActive()
                                       && !g_is_transitioning
                                       && !isCircadianSleepTime()
-                                      && !s_notif_startle_active
-                                      && (g_currentExpr != EXPR_SHOCK && g_currentExpr != EXPR_OVERLOAD);
+                                      && !s_notif_startle_active;
 
         if (can_spontaneous_glance && now >= s_next_random_ambient_check_ms) {
             float glance_scale = getPersonalityAmbientGlanceScale();
@@ -390,7 +401,14 @@ void oledTask(void* pvParameters) {
                 portENTER_CRITICAL(&g_notification_mutex);
                 local_notif = g_notification_info;
                 portEXIT_CRITICAL(&g_notification_mutex);
-                drawNotificationScreen(local_notif, g_animFrame);
+                float remaining_progress = 1.0f;
+                if (s_ambient_popup_until_ms > now && s_staged_notif_duration > 0) {
+                    uint32_t rem = s_ambient_popup_until_ms - now;
+                    remaining_progress = (float)rem / (float)s_staged_notif_duration;
+                    if (remaining_progress > 1.0f) remaining_progress = 1.0f;
+                    if (remaining_progress < 0.0f) remaining_progress = 0.0f;
+                }
+                drawNotificationScreen(local_notif, g_animFrame, remaining_progress);
             } else if (s_active_ambient_mode == AMBIENT_NAVIGATION) {
                 NavigationInfo local_nav;
                 portENTER_CRITICAL(&g_nav_mutex);
@@ -417,111 +435,86 @@ void oledTask(void* pvParameters) {
             } else {
                 updateGazeSystem();
 
-                bool is_sleep_time = isCircadianSleepTime();
-                if (is_sleep_time && !s_notif_startle_active) {
-                    if (now >= s_sleep_substate_timer_ms) {
-                        if (s_sleep_substate == SLEEP_SUBSTATE_DOZING) {
-                            /* Switch to brief drowsy peek for 1.8 - 2.5 seconds */
-                            s_sleep_substate = SLEEP_SUBSTATE_MICRO_WAKE;
-                            s_sleep_substate_timer_ms = now + (esp_random() % 700 + 1800);
+                if (!s_notif_startle_active) {
+                    /* Borbély Two-Process biological sleep pressure: integrates circadian cycle,
+                     * homeostatic neural fatigue, boredom debt, and affective arousal */
+                    float sleep_pressure = getBiologicalSleepPressure();
+                    float restingAperture = (sleep_pressure > 0.20f) ? (1.0f - 0.08f * sleep_pressure) : 1.0f;
+
+                    if (g_blinkState == BLINK_IDLE_STATE) {
+                        g_blinkEyeHeight = restingAperture;
+                        if (g_nextBlinkTime == 0) {
+                            uint32_t initInterval = getPersonalityBlinkInterval();
+                            g_nextBlinkTime = now + initInterval;
+                        }
+                        if (consumeSpontaneousBlinkTrigger() || now >= g_nextBlinkTime) {
+                            g_blinkState = BLINK_CLOSING_STATE;
+                            g_nextBlinkTime = now;
+                            if (s_isDoubleBlinkPending) {
+                                s_isDoubleBlinkPending = false;
+                            } else if ((esp_random() % 100) < getPersonalityDoubleBlinkChance()) {
+                                s_isDoubleBlinkPending = true;
+                            }
+                        }
+                    } else if (g_blinkState == BLINK_CLOSING_STATE) {
+                        /* Eyelid closure slows down continuously with rising sleep pressure */
+                        float closeDuration = 85.0f + 40.0f * sleep_pressure;
+                        float elapsed = (float)(now - g_nextBlinkTime);
+                        if (elapsed >= closeDuration) {
+                            g_blinkEyeHeight = 0.0f;
+                            g_blinkState = BLINK_CLOSED_STATE;
+                            g_nextBlinkTime = now;
+                            /* Stochastic micro-sleep decision queried directly from brain engine */
+                            s_is_drowsy_doze = !s_isDoubleBlinkPending && sampleMicroSleepDecision();
                         } else {
-                            /* Switch to peaceful deep sleep for 10 - 18 seconds */
-                            s_sleep_substate = SLEEP_SUBSTATE_DOZING;
-                            s_sleep_substate_timer_ms = now + (esp_random() % 8000 + 10000);
+                            float t = elapsed / closeDuration;
+                            g_blinkEyeHeight = blinkCloseEase(t);
                         }
-                    }
-
-                    if (s_sleep_substate == SLEEP_SUBSTATE_DOZING) {
-                        g_blinkEyeHeight = 0.0f; /* Closed peaceful sleep line */
-                    } else {
-                        g_blinkEyeHeight = 0.28f; /* Drowsy sleepy eye slit */
-                    }
-                    g_currentExpr = EXPR_IDLE;
-                } else if (!s_notif_startle_active) {
-                    bool canBlink = (g_currentExpr != EXPR_OVERLOAD && g_currentExpr != EXPR_SAD && g_currentExpr != EXPR_JOY);
-
-                    if (!canBlink) {
-                        g_blinkState = BLINK_IDLE_STATE;
-                        g_blinkEyeHeight = 1.0f;
-                    } else {
-                        if (g_blinkState == BLINK_IDLE_STATE) {
-                            if (g_nextBlinkTime == 0) {
-                                uint32_t initInterval = getPersonalityBlinkInterval();
-                                if (g_currentExpr == EXPR_ANGRY) initInterval = (uint32_t)(initInterval * 1.20f);
-                                g_nextBlinkTime = now + initInterval;
-                            }
-                            if (now >= g_nextBlinkTime) {
-                                g_blinkState = BLINK_CLOSING_STATE;
-                                g_nextBlinkTime = now;
-                                if (s_isDoubleBlinkPending) {
-                                    s_isDoubleBlinkPending = false;
-                                } else if ((esp_random() % 100) < getPersonalityDoubleBlinkChance()) {
-                                    s_isDoubleBlinkPending = true;
-                                }
-                            }
+                    } else if (g_blinkState == BLINK_CLOSED_STATE) {
+                        /* Biological palpebral contact dwell: 25-75 ms normal, or dynamic doze duration */
+                        float closedDuration = s_is_drowsy_doze ? getBiologicalDozeDurationMs() : (25.0f + 50.0f * sleep_pressure);
+                        float elapsed = (float)(now - g_nextBlinkTime);
+                        g_blinkEyeHeight = 0.0f;
+                        if (elapsed >= closedDuration) {
+                            g_blinkState = BLINK_OPENING_STATE;
+                            g_nextBlinkTime = now;
+                            s_is_drowsy_doze = false;
                         }
-
-                        if (g_blinkState == BLINK_CLOSING_STATE) {
-                            float elapsed = (float)(now - g_nextBlinkTime);
-                            float duration = (g_currentExpr == EXPR_ANGRY) ? 35.0f : 50.0f;
-                            if (elapsed >= duration) {
-                                g_blinkEyeHeight = 0.0f;
-                                g_blinkState = BLINK_OPENING_STATE;
-                                g_nextBlinkTime = now;
+                    } else if (g_blinkState == BLINK_OPENING_STATE) {
+                        /* Sluggish opening scaled continuously by sleep debt */
+                        float openDuration = 175.0f + 70.0f * sleep_pressure;
+                        float elapsed = (float)(now - g_nextBlinkTime);
+                        if (elapsed >= openDuration) {
+                            g_blinkEyeHeight = restingAperture;
+                            g_blinkState = BLINK_IDLE_STATE;
+                            if (s_isDoubleBlinkPending) {
+                                /* Physiological double-blink pause: 120 ms brief aperture hold */
+                                g_nextBlinkTime = now + 120;
                             } else {
-                                float t = elapsed / duration;
-                                g_blinkEyeHeight = blinkCloseEase(t);
-                            }
-                        } else if (g_blinkState == BLINK_OPENING_STATE) {
-                            float elapsed = (float)(now - g_nextBlinkTime);
-                            float duration = (g_currentExpr == EXPR_ANGRY) ? 80.0f : 110.0f;
-                            if (elapsed >= duration) {
-                                g_blinkEyeHeight = 1.0f;
-                                g_blinkState = BLINK_IDLE_STATE;
-                                if (s_isDoubleBlinkPending) {
-                                    g_nextBlinkTime = now + 120;
-                                } else {
-                                    uint32_t interval = getPersonalityBlinkInterval();
-                                    if (g_currentExpr == EXPR_ANGRY) interval = (uint32_t)(interval * 1.20f);
-                                    g_nextBlinkTime = now + interval;
-                                }
-                            } else {
-                                float t = elapsed / duration;
-                                g_blinkEyeHeight = blinkOpenEase(t);
+                                uint32_t interval = getPersonalityBlinkInterval();
+                                g_nextBlinkTime = now + interval;
                             }
                         } else {
-                            g_blinkEyeHeight = 1.0f;
+                            float t = elapsed / openDuration;
+                            g_blinkEyeHeight = blinkOpenEase(t);
                         }
-                    }
-
-                    /* Apply morning / evening drowsiness factor to eye height when awake */
-                    float drowsiness = getCircadianDrowsiness();
-                    if (drowsiness > 0.05f && g_blinkEyeHeight > 0.2f) {
-                        g_blinkEyeHeight = fmaxf(0.25f, g_blinkEyeHeight * (1.0f - drowsiness * 0.45f));
                     }
                 }
 
-                if (g_currentExpr == EXPR_OVERLOAD || g_currentExpr == EXPR_SAD) {
-                    g_animFrame += 0.025f;
-                }
-
-                drawFace(g_currentExpr, g_blinkEyeHeight, g_currentOffsetX, g_currentOffsetY, g_animFrame, g_currentVergence, g_currentEyeScale);
+                /* Biomechanical head-droop nod (+2.0 px to +3.5 px downward offset) when nodding off */
+                float renderOffsetY = g_currentOffsetY + (s_is_drowsy_doze ? (2.0f + 1.5f * getBiologicalSleepPressure()) : 0.0f);
+                drawFace(g_currentExpr, g_blinkEyeHeight, g_currentOffsetX, renderOffsetY, g_animFrame, g_currentVergence, g_currentEyeScale);
             }
         }
 
-        uint32_t frame_budget_us = (g_recon_state == STATE_SLEEP_RECON) ? FRAME_BUDGET_SLEEP_US : FRAME_BUDGET_ACTIVE_US;
+        /* Enforce rock-solid 60.0 FPS frame budget (16666 us) without FreeRTOS 10ms tick jitter */
         uint32_t frame_elapsed_us = micros() - frame_start_us;
-        if (frame_elapsed_us < frame_budget_us) {
-            uint32_t wait_us = frame_budget_us - frame_elapsed_us;
-            if (wait_us > 2000) {
-                vTaskDelay(pdMS_TO_TICKS((wait_us - 500) / 1000));
-            }
-            uint32_t remaining_us = frame_budget_us - (micros() - frame_start_us);
-            if (remaining_us > 0 && remaining_us < 2000) {
+        if (frame_elapsed_us < FRAME_BUDGET_ACTIVE_US) {
+            uint32_t remaining_us = FRAME_BUDGET_ACTIVE_US - frame_elapsed_us;
+            if (remaining_us > 1500) {
                 delayMicroseconds(remaining_us);
             }
-        } else {
-            vTaskDelay(1);
         }
+        taskYIELD();
     }
 }

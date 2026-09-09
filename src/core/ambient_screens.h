@@ -22,8 +22,8 @@ void renderClockToCanvas(float animFrame, int offsetY = 0);
 void drawClockScreen(float animFrame);
 void renderWeatherToCanvas(const WeatherInfo& weather, float animFrame, int offsetY = 0);
 void drawWeatherScreen(const WeatherInfo& weather, float animFrame);
-void renderNotificationToCanvas(const NotificationInfo& notif, float animFrame, int offsetY = 0);
-void drawNotificationScreen(const NotificationInfo& notif, float animFrame);
+void renderNotificationToCanvas(const NotificationInfo& notif, float animFrame, int offsetY = 0, float progress = 1.0f);
+void drawNotificationScreen(const NotificationInfo& notif, float animFrame, float progress = 1.0f);
 void renderNavigationToCanvas(const NavigationInfo& nav, float animFrame, int offsetY = 0);
 void drawNavigationScreen(const NavigationInfo& nav, float animFrame);
 

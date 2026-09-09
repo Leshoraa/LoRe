@@ -14,6 +14,7 @@
 #include "include/lore_kinematics.h"
 #include "include/lore_affective.h"
 #include "include/lore_ai.h"
+#include "include/lore_autonomic.h"
 #include "include/lore_personality.h"
 #include "src/core/gaze_engine.h"
 #include "src/core/display_engine.h"
@@ -41,6 +42,9 @@ void setup() {
 
     /* Initialize On-Device TinyML Micro-Brain and Homeostatic Drives */
     initBrainEngine();
+
+    /* Initialize Autonomic Brainstem Dynamics (Matsuoka CPG & Homeostatic Soma) */
+    initAutonomicEngine();
 
     /* Load persistent personality traits before any behavioral tick */
     initPersonalityEngine();

@@ -26,8 +26,8 @@ typedef struct {
     float valence;              /* Affective valence [-1.0, +1.0] */
     float arousal;              /* Affective arousal [0.0, 1.0] */
     HomeostaticDrives drives;   /* 5 Homeostatic biological drives */
-    float decision_logits[8];   /* Neural decision logits for each expression */
-    float decision_probs[8];    /* Softmax probabilities for each expression */
+    float decision_logits[NUM_EXPRESSIONS];   /* Neural decision logits for each expression */
+    float decision_probs[NUM_EXPRESSIONS];    /* Softmax probabilities for each expression */
     Expression dominant_expr;   /* Neural policy top chosen expression */
     char thought_summary[48];   /* Human-readable inner monologue */
     uint32_t interaction_sec;   /* Current session interaction seconds */
@@ -48,6 +48,11 @@ void saveBrainMemoryNVS(void);
 void loadBrainMemoryNVS(void);
 float getBrainBondingLevel(void);
 uint32_t getBrainLifetimeSec(void);
+
+/* Borbély Two-Process Biological Sleep Model */
+float getBiologicalSleepPressure(void);
+bool sampleMicroSleepDecision(void);
+float getBiologicalDozeDurationMs(void);
 
 #ifdef __cplusplus
 }
