@@ -130,6 +130,7 @@ void wakeOledFromDeepSleep(uint32_t duration_ms) {
         canvas.fillScreen(0);
         drawFace(EXPR_IDLE, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f);
         canvas.pushSprite(0, 0);
+        resetDrowsyEyelidState();
         g_blinkState = BLINK_OPENING_STATE;
         g_nextBlinkTime = millis();
     }
@@ -153,6 +154,7 @@ void triggerWeatherDisplay(uint32_t duration_ms) {
 void triggerNotificationDisplay(const NotificationInfo& notif, uint32_t duration_ms) {
     (void)notif;
     wakeOledFromDeepSleep(duration_ms + 2500);
+    resetDrowsyEyelidState();
     /* High-attention physical startle reaction on full facial rig before revealing banner */
     s_staged_notif_duration = duration_ms;
     s_notif_startle_start_ms = millis();
@@ -436,13 +438,25 @@ void oledTask(void* pvParameters) {
                 updateGazeSystem();
 
                 if (!s_notif_startle_active) {
-                    /* Borbély Two-Process biological sleep pressure: integrates circadian cycle,
-                     * homeostatic neural fatigue, boredom debt, and affective arousal */
+                    static uint32_t s_last_kinematic_time_us = 0;
+                    uint32_t now_kinematic_us = micros();
+                    float dt_sec = (s_last_kinematic_time_us > 0) ? (float)(now_kinematic_us - s_last_kinematic_time_us) * 0.000001f : 0.016666f;
+                    if (dt_sec < 0.001f) dt_sec = 0.016666f;
+                    if (dt_sec > 0.050f) dt_sec = 0.050f;
+                    s_last_kinematic_time_us = now_kinematic_us;
+
+                    /* Borbély Two-Process biological sleep pressure & Volitional sleep struggle:
+                     * integrates circadian clock, homeostatic neural fatigue, metabolic energy,
+                     * and LoRe's internal agency/will to stay awake. */
                     float sleep_pressure = getBiologicalSleepPressure();
-                    float restingAperture = (sleep_pressure > 0.20f) ? (1.0f - 0.08f * sleep_pressure) : 1.0f;
+                    float volitional_will = getVolitionalVigilance();
+                    float droop_target = getBiologicalDroopAperture();
+
+                    updateDrowsyEyelidKinematics(dt_sec, sleep_pressure, volitional_will, droop_target);
+                    float dynamicAperture = getDrowsyAperture();
 
                     if (g_blinkState == BLINK_IDLE_STATE) {
-                        g_blinkEyeHeight = restingAperture;
+                        g_blinkEyeHeight = dynamicAperture;
                         if (g_nextBlinkTime == 0) {
                             uint32_t initInterval = getPersonalityBlinkInterval();
                             g_nextBlinkTime = now + initInterval;
@@ -468,7 +482,7 @@ void oledTask(void* pvParameters) {
                             s_is_drowsy_doze = !s_isDoubleBlinkPending && sampleMicroSleepDecision();
                         } else {
                             float t = elapsed / closeDuration;
-                            g_blinkEyeHeight = blinkCloseEase(t);
+                            g_blinkEyeHeight = dynamicAperture * blinkCloseEase(t);
                         }
                     } else if (g_blinkState == BLINK_CLOSED_STATE) {
                         /* Biological palpebral contact dwell: 25-75 ms normal, or dynamic doze duration */
@@ -485,7 +499,7 @@ void oledTask(void* pvParameters) {
                         float openDuration = 175.0f + 70.0f * sleep_pressure;
                         float elapsed = (float)(now - g_nextBlinkTime);
                         if (elapsed >= openDuration) {
-                            g_blinkEyeHeight = restingAperture;
+                            g_blinkEyeHeight = dynamicAperture;
                             g_blinkState = BLINK_IDLE_STATE;
                             if (s_isDoubleBlinkPending) {
                                 /* Physiological double-blink pause: 120 ms brief aperture hold */
@@ -496,13 +510,15 @@ void oledTask(void* pvParameters) {
                             }
                         } else {
                             float t = elapsed / openDuration;
-                            g_blinkEyeHeight = blinkOpenEase(t);
+                            g_blinkEyeHeight = dynamicAperture * blinkOpenEase(t);
                         }
                     }
                 }
 
-                /* Biomechanical head-droop nod (+2.0 px to +3.5 px downward offset) when nodding off */
-                float renderOffsetY = g_currentOffsetY + (s_is_drowsy_doze ? (2.0f + 1.5f * getBiologicalSleepPressure()) : 0.0f);
+                /* Biomechanical head-droop nod (+2.0 px to +3.5 px downward offset) when nodding off,
+                 * dynamically coupled to physical sleep struggle and micro-sleep dozes */
+                float nodY = s_is_drowsy_doze ? (2.0f + 1.5f * getBiologicalSleepPressure()) : getDrowsyNodOffsetY();
+                float renderOffsetY = g_currentOffsetY + nodY;
                 drawFace(g_currentExpr, g_blinkEyeHeight, g_currentOffsetX, renderOffsetY, g_animFrame, g_currentVergence, g_currentEyeScale);
             }
         }

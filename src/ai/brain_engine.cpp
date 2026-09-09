@@ -7,6 +7,7 @@
 #include "src/ai/memory_engine.h"
 #include "src/math/affective_engine.h"
 #include "src/ai/personality_engine.h"
+#include "src/ai/autonomic_engine.h"
 #include "src/config/lore_config.h"
 #include "src/types/lore_types.h"
 #include <math.h>
@@ -280,8 +281,14 @@ void updateBrainEngine(float dt_sec) {
     PersonalityTraits traits = getPersonalityTraits();
     CircadianState circa = getCircadianState();
 
-    if (s_drives.fatigue > 0.70f) {
-        if (circa.energy_level < 0.40f)
+    float sleep_p = getBiologicalSleepPressure();
+    if (s_drives.fatigue > 0.70f || sleep_p > 0.60f) {
+        float will = getVolitionalVigilance();
+        if (is_detected && will > 0.30f)
+            snprintf(s_thought_summary, sizeof(s_thought_summary), "Fighting sleep... staying with you");
+        else if (will > 0.40f)
+            snprintf(s_thought_summary, sizeof(s_thought_summary), "Heavy eyelids... trying to stay awake");
+        else if (circa.energy_level < 0.40f)
             snprintf(s_thought_summary, sizeof(s_thought_summary), "So tired... everything is heavy");
         else if (traits.playfulness > 0.60f)
             snprintf(s_thought_summary, sizeof(s_thought_summary), "Sleepy but still wanna play...");
@@ -388,6 +395,55 @@ float getBiologicalSleepPressure(void) {
                        - (0.40f * arousal);
 
     return constrain(raw_pressure, 0.0f, 1.0f);
+}
+
+static const float kVigilanceCuriosityWeight = 0.30f;
+static const float kVigilanceSocialWeight    = 0.25f;
+static const float kVigilanceBondingWeight   = 0.20f;
+static const float kVigilancePlayWeight      = 0.15f;
+static const float kVigilanceMischiefWeight  = 0.10f;
+static const float kVigilanceArousalWeight   = 0.25f;
+static const float kVigilanceFatigueWeight   = 0.35f;
+static const float kVigilanceBoredomWeight   = 0.25f;
+
+static const float kDroopPressureWeight = 0.82f;
+static const float kDroopEnergyWeight   = 0.18f;
+static const float kDroopWillResistance = 0.42f;
+static const float kMinDroopAperture    = 0.12f;
+static const float kMaxDroopAperture    = 0.92f;
+
+float getVolitionalVigilance(void) {
+    PersonalityTraits traits = getPersonalityTraits();
+    float arousal = getEmotionArousal();
+
+    float social_drive = s_drives.social * (0.60f + 0.40f * s_presence_ema);
+    float will = (kVigilanceCuriosityWeight * s_drives.curiosity)
+               + (kVigilanceSocialWeight    * social_drive)
+               + (kVigilanceBondingWeight   * s_bonding_level)
+               + (kVigilancePlayWeight      * traits.playfulness)
+               + (kVigilanceMischiefWeight  * s_drives.mischief)
+               + (kVigilanceArousalWeight   * arousal)
+               - (kVigilanceFatigueWeight   * s_drives.fatigue)
+               - (kVigilanceBoredomWeight   * s_drives.boredom);
+
+    return constrain(will, 0.0f, 1.0f);
+}
+
+float getBiologicalDroopAperture(void) {
+    float pressure = getBiologicalSleepPressure();
+    if (pressure < 0.25f) {
+        return 1.0f;
+    }
+
+    AutonomicTelemetry auto_tel = getAutonomicTelemetry();
+    float energy = auto_tel.metabolic_energy;
+    float will = getVolitionalVigilance();
+
+    float sag = (kDroopPressureWeight * pressure + kDroopEnergyWeight * (1.0f - energy))
+              * (1.0f - kDroopWillResistance * will);
+    float droop_aperture = 1.0f - sag;
+
+    return constrain(droop_aperture, kMinDroopAperture, kMaxDroopAperture);
 }
 
 bool sampleMicroSleepDecision(void) {

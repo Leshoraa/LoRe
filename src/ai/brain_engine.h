@@ -49,8 +49,10 @@ void loadBrainMemoryNVS(void);
 float getBrainBondingLevel(void);
 uint32_t getBrainLifetimeSec(void);
 
-/* Borbély Two-Process Biological Sleep Model */
+/* Borbély Two-Process Biological Sleep Model & Palpebral Struggle Dynamics */
 float getBiologicalSleepPressure(void);
+float getVolitionalVigilance(void);
+float getBiologicalDroopAperture(void);
 bool sampleMicroSleepDecision(void);
 float getBiologicalDozeDurationMs(void);
 

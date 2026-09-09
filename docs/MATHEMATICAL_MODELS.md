@@ -144,6 +144,27 @@ Dynamic stadium corner radius smoothly adapts across the palpebral aperture:
 $$r(h_{\text{curr}}) = \begin{cases} 5, & h_{\text{curr}} \ge 24 \\ 4, & 16 \le h_{\text{curr}} < 24 \\ 3, & 10 \le h_{\text{curr}} < 16 \\ 2, & 5 \le h_{\text{curr}} < 10 \\ 1, & h_{\text{curr}} < 5 \end{cases}$$
 When $h \ge 0.99$, the original 80x30 Lopaka monochrome bitmap (`FACE_IDLE_BITS`) is rendered bit-exact. When $h \le 0.05$, the original 32x2 rounded closed slit is rendered, preserving 100% of the initial aesthetic design while providing continuous fluid biological motion.
 
+### 7.4 Neuro-Biomechanical Palpebral Dynamics & Volitional Sleep-Struggle Physical Law
+Rather than static aperture clamping or scripted animation sequences, the drowsy eye behavior and the struggle to stay awake emerge from the physical equilibrium between gravitational/fatigue eyelid sag and cortical volitional vigilance:
+
+#### 7.4.1 Volitional Vigilance Drive ($V_{\text{will}} \in [0, 1]$)
+LoRe's internal agency and conscious desire to maintain wakefulness are integrated directly from homeostatic drives, companion social bonding, and sympathetic arousal:
+$$V_{\text{will}} = \mathrm{clamp}\Big( 0.30 \cdot \text{Curiosity} + 0.25 \cdot \text{Social} \cdot (0.6 + 0.4 \cdot \text{Presence}) + 0.20 \cdot \text{Bonding} + 0.15 \cdot \text{Playfulness} + 0.10 \cdot \text{Mischief} + 0.25 \cdot \text{Arousal} - 0.35 \cdot \text{Fatigue} - 0.25 \cdot \text{Boredom}, \ 0.0, \ 1.0 \Big)$$
+
+#### 7.4.2 Equilibrium Droop Aperture ($h_{\text{droop}}$)
+When $P_{\text{sleep}} \ge 0.25$, levator palpebrae superioris muscle tone decreases, settling into a continuous equilibrium aperture:
+$$h_{\text{droop}} = \mathrm{clamp}\left( 1.0 - \left[ 0.82 \cdot P_{\text{sleep}} + 0.18 \cdot (1.0 - E_{\text{metabolic}}) \right] \cdot (1.0 - 0.42 \cdot V_{\text{will}}), \ 0.12, \ 0.92 \right)$$
+- At moderate drowsiness ($P_{\text{sleep}} \approx 0.55$), $h_{\text{droop}} \approx 0.45 - 0.55$ (*half-closed / "merem setengah"*).
+- When a human companion is present and bonding is high, $V_{\text{will}}$ elevates $h_{\text{droop}}$, actively resisting eyelid closure.
+
+#### 7.4.3 Multi-Phase Sleep-Struggle Biomechanical ODE
+The palpebral aperture $h(t)$ and downward head droop $y_{\text{nod}}(t)$ continuously evolve across four coupled physical phases:
+$$\tau_{\text{lid}} \frac{dh}{dt} = h_{\text{target}}(t) - h(t)$$
+1. **Viscous Sinking (Slow Droop):** Sluggish relaxation under neuro-metabolic fatigue ($\tau_{\text{droop}} = 0.70 + 0.65 P_{\text{sleep}}\text{ s}$). Head nods downward: $y_{\text{nod}} \to (1.0 - h)(2.2 + 1.3 P_{\text{sleep}})\text{ px}$.
+2. **Hovering Dwell ("Merem Setengah"):** Eyelid hovers at $h_{\text{droop}}$ with subtle organic micro-tremor ($1.8\%$ amplitude) for $\Delta t_{\text{hover}} = 0.35 + 1.10(1.0 - V_{\text{will}})\text{ s}$.
+3. **Cortical Vigilance Recovery Surge ("Snap-Awake Rebound"):** Sudden burst of motor excitation snaps eyelids open to $h_{\text{snap}} = \mathrm{clamp}(0.72 + 0.28 V_{\text{will}} - 0.10 P_{\text{sleep}}, 0.65, 1.0)$ with high acceleration ($\tau_{\text{snap}} \approx 110-160\text{ ms}$), rebounding the head nod back upright.
+4. **Effort Hold:** LoRe maintains open aperture for a volitional stamina window $\Delta t_{\text{effort}} = 0.45 + 2.40 V_{\text{will}}(1.0 - 0.55 P_{\text{sleep}})\text{ s}$, after which fatigue depletes motor stamina and transitions back to Sinking.
+
 ---
 
 ## 8. Autonomic Brainstem Dynamics: Matsuoka Central Pattern Generator (CPG) & Homeostatic Drift

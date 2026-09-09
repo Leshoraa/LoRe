@@ -493,3 +493,177 @@ float getOcularVergence(void) {
     return g_currentVergence;
 }
 
+/* Palpebral parameters and time constants for biological sleep-struggle dynamics */
+static const float kDrowsyThreshold = 0.25f;
+static const float kDroopTauBaseSec = 0.70f;
+static const float kDroopTauScaleSec = 0.65f;
+static const float kNodBasePx = 2.2f;
+static const float kNodScalePx = 1.3f;
+static const float kNodRelaxRate = 3.5f;
+static const float kNodHoverRate = 4.0f;
+static const float kNodReboundRate = 18.0f;
+static const float kHoverBaseDurationSec = 0.35f;
+static const float kHoverWillScaleSec = 1.10f;
+static const float kHoverNoiseScaleSec = 0.25f;
+static const float kHoverMicroTremorAmp = 0.018f;
+static const float kHoverMicroTremorFreq = 3.5f;
+static const float kSnapTauBaseSec = 0.11f;
+static const float kSnapTauScaleSec = 0.05f;
+static const float kEffortBaseDurationSec = 0.45f;
+static const float kEffortWillScaleSec = 2.40f;
+static const float kEffortSleepDamp = 0.55f;
+static const float kMinPalpebralAperture = 0.05f;
+static const float kMaxPalpebralAperture = 1.0f;
+static const float kMaxNodOffsetPx = 4.0f;
+
+typedef enum {
+    DROWSY_PHASE_AWAKE = 0,
+    DROWSY_PHASE_SINKING,
+    DROWSY_PHASE_HOVERING,
+    DROWSY_PHASE_RECOVERY_SNAP,
+    DROWSY_PHASE_EFFORT_HOLD
+} DrowsyStrugglePhase;
+
+static DrowsyStrugglePhase s_drowsy_phase = DROWSY_PHASE_AWAKE;
+static float s_drowsy_aperture = 1.0f;
+static float s_drowsy_nod_y = 0.0f;
+static float s_snap_target = 0.85f;
+static float s_hover_duration = 0.80f;
+static float s_effort_duration = 1.20f;
+static float s_phase_timer = 0.0f;
+static float s_hover_micro_phase = 0.0f;
+
+static inline float get_kinematic_random_01(void) {
+#if defined(ESP_PLATFORM) || defined(ARDUINO)
+    return (float)(esp_random() % 10000) / 10000.0f;
+#else
+    return (float)(rand() % 10000) / 10000.0f;
+#endif
+}
+
+void resetDrowsyEyelidState(void) {
+    s_drowsy_phase = DROWSY_PHASE_AWAKE;
+    s_drowsy_aperture = 1.0f;
+    s_drowsy_nod_y = 0.0f;
+    s_phase_timer = 0.0f;
+}
+
+bool isDrowsyStruggleActive(void) {
+    return (s_drowsy_phase != DROWSY_PHASE_AWAKE);
+}
+
+float getDrowsyAperture(void) {
+    return s_drowsy_aperture;
+}
+
+float getDrowsyNodOffsetY(void) {
+    return s_drowsy_nod_y;
+}
+
+void updateDrowsyEyelidKinematics(float dt_sec, float sleep_pressure, float volitional_will, float droop_target) {
+    if (dt_sec <= 0.0001f) dt_sec = 0.016666f;
+    if (dt_sec > 0.10f) dt_sec = 0.10f;
+
+    if (sleep_pressure < kDrowsyThreshold) {
+        if (s_drowsy_phase != DROWSY_PHASE_AWAKE) {
+            float alpha = 1.0f - expf(-8.0f * dt_sec);
+            s_drowsy_aperture += (1.0f - s_drowsy_aperture) * alpha;
+            s_drowsy_nod_y += (0.0f - s_drowsy_nod_y) * alpha;
+            if (s_drowsy_aperture > 0.98f && fabsf(s_drowsy_nod_y) < 0.1f) {
+                s_drowsy_aperture = 1.0f;
+                s_drowsy_nod_y = 0.0f;
+                s_drowsy_phase = DROWSY_PHASE_AWAKE;
+            }
+        }
+        return;
+    }
+
+    if (s_drowsy_phase == DROWSY_PHASE_AWAKE) {
+        s_drowsy_phase = DROWSY_PHASE_SINKING;
+        s_phase_timer = 0.0f;
+    }
+
+    s_phase_timer += dt_sec;
+
+    switch (s_drowsy_phase) {
+        case DROWSY_PHASE_SINKING: {
+            float tau_droop = kDroopTauBaseSec + kDroopTauScaleSec * sleep_pressure;
+            float alpha_droop = 1.0f - expf(-dt_sec / tau_droop);
+            s_drowsy_aperture += (droop_target - s_drowsy_aperture) * alpha_droop;
+
+            float target_nod = (1.0f - s_drowsy_aperture) * (kNodBasePx + kNodScalePx * sleep_pressure);
+            float alpha_nod = 1.0f - expf(-kNodRelaxRate * dt_sec);
+            s_drowsy_nod_y += (target_nod - s_drowsy_nod_y) * alpha_nod;
+
+            if (fabsf(s_drowsy_aperture - droop_target) < 0.035f || s_phase_timer > 3.0f) {
+                s_drowsy_phase = DROWSY_PHASE_HOVERING;
+                s_phase_timer = 0.0f;
+                s_hover_duration = kHoverBaseDurationSec + kHoverWillScaleSec * (1.0f - volitional_will)
+                                 + kHoverNoiseScaleSec * get_kinematic_random_01();
+            }
+            break;
+        }
+
+        case DROWSY_PHASE_HOVERING: {
+            s_hover_micro_phase += dt_sec * kHoverMicroTremorFreq;
+            float micro_osc = kHoverMicroTremorAmp * sinf(s_hover_micro_phase);
+            s_drowsy_aperture = droop_target + micro_osc;
+
+            float target_nod = (1.0f - droop_target) * (kNodBasePx + kNodScalePx * sleep_pressure);
+            float alpha_nod = 1.0f - expf(-kNodHoverRate * dt_sec);
+            s_drowsy_nod_y += (target_nod - s_drowsy_nod_y) * alpha_nod;
+
+            if (s_phase_timer >= s_hover_duration) {
+                s_phase_timer = 0.0f;
+                float p_fight = 0.35f + 0.60f * volitional_will - 0.20f * sleep_pressure;
+                p_fight = constrain(p_fight, 0.15f, 0.95f);
+
+                s_drowsy_phase = DROWSY_PHASE_RECOVERY_SNAP;
+                if (get_kinematic_random_01() <= p_fight) {
+                    s_snap_target = constrain(0.72f + 0.28f * volitional_will - 0.10f * sleep_pressure, 0.65f, 1.0f);
+                } else {
+                    s_snap_target = constrain(0.60f + 0.25f * volitional_will, 0.55f, 0.85f);
+                }
+            }
+            break;
+        }
+
+        case DROWSY_PHASE_RECOVERY_SNAP: {
+            float tau_snap = kSnapTauBaseSec + kSnapTauScaleSec * sleep_pressure;
+            float alpha_snap = 1.0f - expf(-dt_sec / tau_snap);
+            s_drowsy_aperture += (s_snap_target - s_drowsy_aperture) * alpha_snap;
+
+            float alpha_head = 1.0f - expf(-kNodReboundRate * dt_sec);
+            s_drowsy_nod_y += (0.0f - s_drowsy_nod_y) * alpha_head;
+
+            if (s_drowsy_aperture >= s_snap_target - 0.03f || s_phase_timer > 0.45f) {
+                s_drowsy_phase = DROWSY_PHASE_EFFORT_HOLD;
+                s_phase_timer = 0.0f;
+                s_effort_duration = kEffortBaseDurationSec
+                                  + kEffortWillScaleSec * volitional_will * (1.0f - kEffortSleepDamp * sleep_pressure)
+                                  + 0.30f * get_kinematic_random_01();
+            }
+            break;
+        }
+
+        case DROWSY_PHASE_EFFORT_HOLD: {
+            s_drowsy_aperture = s_snap_target;
+            float alpha_head = 1.0f - expf(-10.0f * dt_sec);
+            s_drowsy_nod_y += (0.0f - s_drowsy_nod_y) * alpha_head;
+
+            if (s_phase_timer >= s_effort_duration) {
+                s_drowsy_phase = DROWSY_PHASE_SINKING;
+                s_phase_timer = 0.0f;
+            }
+            break;
+        }
+
+        default:
+            s_drowsy_phase = DROWSY_PHASE_AWAKE;
+            break;
+    }
+
+    s_drowsy_aperture = constrain(s_drowsy_aperture, kMinPalpebralAperture, kMaxPalpebralAperture);
+    s_drowsy_nod_y = constrain(s_drowsy_nod_y, 0.0f, kMaxNodOffsetPx);
+}
+

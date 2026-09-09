@@ -70,61 +70,80 @@ static void draw_heartbeat_icon(LGFX_Sprite& cv, int x, int y, bool is_beating, 
     cv.print(is_synced ? "OK" : "..");
 }
 
-static void draw_weather_glyph(LGFX_Sprite& cv, int weather_code, int icx, int icy, float animFrame) {
+static void draw_weather_glyph(LGFX_Sprite& cv, int weather_code, int icx, int icy, float animFrame, uint32_t color = TFT_BLACK) {
     int code = weather_code;
     if (code == 0 || code == 1) {
         /* Sun: solid glowing core + 8 animated rotating corona rays */
-        cv.fillCircle(icx, icy, 5, TFT_WHITE);
+        cv.fillCircle(icx, icy, 4, color);
         for (int i = 0; i < 8; i++) {
             float angle = (float)i * (2.0f * (float)M_PI / 8.0f) + animFrame * 0.16f;
-            int x1 = icx + (int)roundf(cosf(angle) * 7.0f);
-            int y1 = icy + (int)roundf(sinf(angle) * 7.0f);
-            int x2 = icx + (int)roundf(cosf(angle) * 11.0f);
-            int y2 = icy + (int)roundf(sinf(angle) * 11.0f);
-            cv.drawLine(x1, y1, x2, y2, TFT_WHITE);
+            int x1 = icx + (int)roundf(cosf(angle) * 6.0f);
+            int y1 = icy + (int)roundf(sinf(angle) * 6.0f);
+            int x2 = icx + (int)roundf(cosf(angle) * 9.0f);
+            int y2 = icy + (int)roundf(sinf(angle) * 9.0f);
+            cv.drawLine(x1, y1, x2, y2, color);
         }
     } else if ((code >= 51 && code <= 67) || (code >= 80 && code <= 82)) {
-        /* Rain: detailed puffy cloud + 3 animated slanted falling raindrops */
-        cv.fillCircle(icx - 6, icy - 3, 4, TFT_WHITE);
-        cv.fillCircle(icx,     icy - 6, 6, TFT_WHITE);
-        cv.fillCircle(icx + 6, icy - 3, 4, TFT_WHITE);
-        cv.fillRect(icx - 9,   icy - 3, 18, 5, TFT_WHITE);
+        /* Rain: cloud + animated slanted falling raindrops */
+        cv.fillCircle(icx - 5, icy - 1, 3, color);
+        cv.fillCircle(icx,     icy - 3, 4, color);
+        cv.fillCircle(icx + 5, icy - 1, 3, color);
+        cv.fillRect(icx - 7,   icy - 1, 14, 4, color);
 
-        int drop_shift = ((int)(animFrame * 5.0f)) % 5;
-        for (int r = -6; r <= 6; r += 6) {
+        int drop_shift = ((int)(animFrame * 5.0f)) % 3;
+        for (int r = -5; r <= 5; r += 5) {
             int rx = icx + r;
-            int ry = icy + 3 + drop_shift;
-            cv.drawLine(rx, ry, rx - 1, ry + 2, TFT_WHITE);
+            int ry = icy + 4 + drop_shift;
+            cv.drawLine(rx, ry, rx - 1, ry + 2, color);
         }
     } else if (code >= 95 && code <= 99) {
         /* Thunderstorm: cloud + flashing zigzag lightning bolt */
-        cv.fillCircle(icx - 6, icy - 3, 4, TFT_WHITE);
-        cv.fillCircle(icx,     icy - 6, 6, TFT_WHITE);
-        cv.fillCircle(icx + 6, icy - 3, 4, TFT_WHITE);
-        cv.fillRect(icx - 9,   icy - 3, 18, 5, TFT_WHITE);
+        cv.fillCircle(icx - 5, icy - 1, 3, color);
+        cv.fillCircle(icx,     icy - 3, 4, color);
+        cv.fillCircle(icx + 5, icy - 1, 3, color);
+        cv.fillRect(icx - 7,   icy - 1, 14, 4, color);
 
         bool bolt_on = ((int)(animFrame * 6.0f) % 3) != 0;
         if (bolt_on) {
-            cv.drawLine(icx,     icy + 2, icx - 3, icy + 6,  TFT_WHITE);
-            cv.drawLine(icx - 3, icy + 6, icx + 1, icy + 6,  TFT_WHITE);
-            cv.drawLine(icx + 1, icy + 6, icx - 2, icy + 12, TFT_WHITE);
+            cv.drawLine(icx,     icy + 3, icx - 2, icy + 6,  color);
+            cv.drawLine(icx - 2, icy + 6, icx + 1, icy + 6,  color);
+            cv.drawLine(icx + 1, icy + 6, icx - 1, icy + 10, color);
+        }
+    } else if (code >= 71 && code <= 77) {
+        /* Snow: cloud + falling snowflakes */
+        cv.fillCircle(icx - 5, icy - 1, 3, color);
+        cv.fillCircle(icx,     icy - 3, 4, color);
+        cv.fillCircle(icx + 5, icy - 1, 3, color);
+        cv.fillRect(icx - 7,   icy - 1, 14, 4, color);
+
+        int flake_shift = ((int)(animFrame * 4.0f)) % 3;
+        for (int r = -4; r <= 4; r += 4) {
+            int fx = icx + r;
+            int fy = icy + 5 + ((flake_shift + (r == 0 ? 1 : 0)) % 3);
+            cv.drawPixel(fx, fy, color);
+            cv.drawPixel(fx - 1, fy, color);
+            cv.drawPixel(fx + 1, fy, color);
+            cv.drawPixel(fx, fy - 1, color);
+            cv.drawPixel(fx, fy + 1, color);
         }
     } else if (code == 45 || code == 48) {
         /* Fog: 3 stratified wavy mist lines */
-        cv.drawFastHLine(icx - 11, icy - 5, 22, TFT_WHITE);
-        cv.drawFastHLine(icx - 8,  icy,     16, TFT_WHITE);
-        cv.drawFastHLine(icx - 11, icy + 5, 22, TFT_WHITE);
+        cv.drawFastHLine(icx - 8, icy - 5, 16, color);
+        cv.drawFastHLine(icx - 6, icy,     12, color);
+        cv.drawFastHLine(icx - 8, icy + 5, 16, color);
     } else {
         /* Clouds / Overcast */
         if (code == 2) {
             /* Partly cloudy: sun disc peeking behind */
-            cv.drawCircle(icx + 7, icy - 7, 4, TFT_WHITE);
-            cv.fillCircle(icx + 7, icy - 7, 2, TFT_WHITE);
+            cv.drawCircle(icx + 5, icy - 3, 3, color);
+            cv.fillCircle(icx + 5, icy - 3, 2, color);
+            cv.drawLine(icx + 9, icy - 3, icx + 11, icy - 3, color);
+            cv.drawLine(icx + 5, icy - 7, icx + 5,  icy - 9, color);
         }
-        cv.fillCircle(icx - 6, icy - 3, 5, TFT_WHITE);
-        cv.fillCircle(icx,     icy - 6, 7, TFT_WHITE);
-        cv.fillCircle(icx + 6, icy - 3, 5, TFT_WHITE);
-        cv.fillRect(icx - 9,   icy - 3, 18, 6, TFT_WHITE);
+        cv.fillCircle(icx - 5, icy + 2, 4, color);
+        cv.fillCircle(icx,     icy - 1, 5, color);
+        cv.fillCircle(icx + 5, icy + 2, 4, color);
+        cv.fillRect(icx - 7,   icy + 2, 15, 5, color);
     }
 }
 
@@ -179,6 +198,8 @@ static void wrap_notification_text(const char* msg, char lines[2][22]) {
 
 void renderClockToCanvas(float animFrame, int offsetY) {
     LGFX_Sprite& cv = *s_ambient_canvas;
+    cv.fillScreen(TFT_WHITE);
+
     time_t now_sec;
     time(&now_sec);
     struct tm timeinfo;
@@ -189,150 +210,107 @@ void renderClockToCanvas(float animFrame, int offsetY) {
         memset(&timeinfo, 0, sizeof(timeinfo));
     }
 
-    /* Top Header: Wi-Fi status on left */
-    draw_wifi_status_icon(cv, 6, 7 + offsetY, isWiFiConnected());
+    /* Top Title: Focus Time !! */
+    cv.setTextSize(1);
+    cv.setTextColor(TFT_BLACK, TFT_WHITE);
+    const char* title_text = "Focus Time !!";
+    int title_x = (OLED_PANEL_WIDTH_PX - (int)strlen(title_text) * 6) / 2;
+    cv.setCursor(title_x, 5 + offsetY);
+    cv.print(title_text);
 
-    /* Top Header: Live heartbeat / NTP sync indicator on right */
-    bool heart_beat = time_synced ? (timeinfo.tm_sec % 2 == 0) : ((int)(animFrame * 3.0f) % 2 == 0);
-    draw_heartbeat_icon(cv, 97, 7 + offsetY, heart_beat, time_synced);
+    /* Rounded Clock Box Dimensions and Position */
+    int box_w = 104;
+    int box_h = 28;
+    int radius = 4;
+    int box_x = (OLED_PANEL_WIDTH_PX - box_w) / 2;
+    int box_y = 18 + offsetY;
 
-    /* Separator line framing status header */
-    cv.drawFastHLine(6, 23 + offsetY, OLED_PANEL_WIDTH_PX - 12, TFT_WHITE);
-    cv.drawPixel(6, 22 + offsetY, TFT_WHITE);
-    cv.drawPixel(OLED_PANEL_WIDTH_PX - 7, 22 + offsetY, TFT_WHITE);
+    /* 1. Base 1px Rounded Rectangle Border (Black) */
+    cv.drawRoundRect(box_x, box_y, box_w, box_h, radius, TFT_BLACK);
 
-    /* Hero Digital Clock format */
-    char hm_buf[8];
+    /* 2. 3D Retro Shadow / Beveled Frame: Thick Top & Right border (2px) */
+    cv.drawFastHLine(box_x + 2, box_y + 1, box_w - 4, TFT_BLACK);
+    cv.drawFastVLine(box_x + box_w - 2, box_y + 2, box_h - 4, TFT_BLACK);
+    cv.drawPixel(box_x + box_w - 2, box_y + 1, TFT_BLACK);
+    cv.drawPixel(box_x + 1, box_y + 1, TFT_BLACK);
+
+    /* Clock Digits: HH : MM format */
+    char hm_buf[12];
     bool colon_on = time_synced ? (timeinfo.tm_sec % 2 == 0) : ((int)(animFrame * 2.5f) % 2 == 0);
     if (time_synced) {
-        snprintf(hm_buf, sizeof(hm_buf), "%02d%c%02d", timeinfo.tm_hour, colon_on ? ':' : ' ', timeinfo.tm_min);
+        snprintf(hm_buf, sizeof(hm_buf), "%02d %c %02d", timeinfo.tm_hour, colon_on ? ':' : ' ', timeinfo.tm_min);
     } else {
-        snprintf(hm_buf, sizeof(hm_buf), "--%c--", colon_on ? ':' : ' ');
+        snprintf(hm_buf, sizeof(hm_buf), "20 %c 20", colon_on ? ':' : ' ');
     }
 
-    /* Left analog micro-clock glyph */
-    cv.drawCircle(16, 33 + offsetY, 6, TFT_WHITE);
-    cv.drawLine(16, 33 + offsetY, 16, 30 + offsetY, TFT_WHITE);
-    cv.drawLine(16, 33 + offsetY, 19, 33 + offsetY, TFT_WHITE);
-
-    /* Centered big digital digits */
     cv.setTextSize(2);
-    cv.setTextColor(TFT_WHITE, TFT_BLACK);
-    cv.setCursor(30, 25 + offsetY);
+    cv.setTextColor(TFT_BLACK, TFT_WHITE);
+    int digits_x = box_x + (box_w - (int)strlen(hm_buf) * 12) / 2;
+    cv.setCursor(digits_x, box_y + 6);
     cv.print(hm_buf);
 
-    /* Seconds subscript on the right of the clock */
+    /* Date Line below the clock frame (replacing "1/3 sessions") */
+    char date_buf[24];
+    if (time_synced) {
+        static const char* months[] = {"Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"};
+        snprintf(date_buf, sizeof(date_buf), "%d %s %04d", timeinfo.tm_mday, months[timeinfo.tm_mon % 12], timeinfo.tm_year + 1900);
+    } else {
+        snprintf(date_buf, sizeof(date_buf), "13 Agu 2026");
+    }
+
     cv.setTextSize(1);
-    if (time_synced) {
-        char sec_buf[4];
-        snprintf(sec_buf, sizeof(sec_buf), "%02d", timeinfo.tm_sec);
-        cv.setCursor(94, 25 + offsetY);
-        cv.print(sec_buf);
-        cv.setCursor(94, 33 + offsetY);
-        cv.print("s");
-    } else {
-        cv.setCursor(94, 28 + offsetY);
-        cv.print("--");
-    }
-
-    /* Date line with Day-of-Week Pill */
-    if (time_synced) {
-        static const char* days[] = {"SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"};
-        static const char* months[] = {"JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"};
-
-        cv.fillRoundRect(12, 43 + offsetY, 24, 9, 2, TFT_WHITE);
-        cv.setTextColor(TFT_BLACK, TFT_WHITE);
-        cv.setTextSize(1);
-        cv.setCursor(14, 44 + offsetY);
-        cv.print(days[timeinfo.tm_wday % 7]);
-
-        cv.setTextColor(TFT_WHITE, TFT_BLACK);
-        char date_buf[20];
-        snprintf(date_buf, sizeof(date_buf), "%02d %s %04d", timeinfo.tm_mday, months[timeinfo.tm_mon % 12], timeinfo.tm_year + 1900);
-        cv.setCursor(42, 44 + offsetY);
-        cv.print(date_buf);
-    } else {
-        cv.setTextSize(1);
-        cv.setTextColor(TFT_WHITE, TFT_BLACK);
-        cv.setCursor(24, 44 + offsetY);
-        cv.print("Synchronizing NTP...");
-    }
-
-    /* Dynamic 60-second progress bar track */
-    cv.drawFastHLine(14, 56 + offsetY, 100, TFT_WHITE);
-    int sec_w = time_synced ? ((timeinfo.tm_sec * 100) / 59) : (((int)(animFrame * 25.0f)) % 100);
-    if (sec_w > 100) sec_w = 100;
-    if (sec_w > 0) {
-        cv.drawFastHLine(14, 55 + offsetY, sec_w, TFT_WHITE);
-        cv.drawFastHLine(14, 57 + offsetY, sec_w, TFT_WHITE);
-    }
-    int head_x = 14 + sec_w;
-    if (head_x > 114) head_x = 114;
-    cv.fillCircle(head_x, 56 + offsetY, 2, TFT_WHITE);
+    cv.setTextColor(TFT_BLACK, TFT_WHITE);
+    int date_x = (OLED_PANEL_WIDTH_PX - (int)strlen(date_buf) * 6) / 2;
+    cv.setCursor(date_x, 51 + offsetY);
+    cv.print(date_buf);
 }
 
 void drawClockScreen(float animFrame) {
     LGFX_Sprite& cv = *s_ambient_canvas;
-    cv.fillScreen(TFT_BLACK);
     int burn_y = get_burn_shift_y();
 
-    /* Hybrid top zone: Living companion eyes */
-    drawMiniFace(EXPR_IDLE, g_blinkEyeHeight, g_currentOffsetX * 0.35f, g_currentOffsetY * 0.35f, 0.5f);
-
-    /* Hybrid bottom zone: Digital Clock */
     renderClockToCanvas(animFrame, burn_y);
     cv.pushSprite(0, 0);
 }
 
 void renderWeatherToCanvas(const WeatherInfo& weather, float animFrame, int offsetY) {
     LGFX_Sprite& cv = *s_ambient_canvas;
+    cv.fillScreen(TFT_WHITE);
 
-    /* Top Header: Left city badge */
-    char city_tag[6];
+    /* Top Title: City name only (e.g. "Jakarta") */
+    char title_buf[32];
     if (weather.valid && weather.city[0] != '\0') {
-        city_tag[0] = (char)toupper((unsigned char)weather.city[0]);
-        city_tag[1] = (char)toupper((unsigned char)weather.city[1]);
-        city_tag[2] = (char)toupper((unsigned char)weather.city[2]);
-        city_tag[3] = '\0';
+        snprintf(title_buf, sizeof(title_buf), "%s", weather.city);
     } else {
-        strncpy(city_tag, "LOC", sizeof(city_tag));
+        snprintf(title_buf, sizeof(title_buf), "%s", WEATHER_DEFAULT_CITY);
     }
-    cv.fillRoundRect(6, 6 + offsetY, 26, 11, 2, TFT_WHITE);
+    cv.setTextSize(1);
     cv.setTextColor(TFT_BLACK, TFT_WHITE);
-    cv.setTextSize(1);
-    cv.setCursor(9, 8 + offsetY);
-    cv.print(city_tag);
+    int title_x = (OLED_PANEL_WIDTH_PX - (int)strlen(title_buf) * 6) / 2;
+    if (title_x < 2) title_x = 2;
+    cv.setCursor(title_x, 5 + offsetY);
+    cv.print(title_buf);
 
-    /* Top Header: Right weather condition tag */
-    const char* cond_tag = "NORM";
-    if (weather.valid) {
-        int c = weather.weather_code;
-        if (c == 0 || c == 1) cond_tag = "SUN";
-        else if (c == 2 || c == 3) cond_tag = "CLD";
-        else if (c == 45 || c == 48) cond_tag = "FOG";
-        else if (c >= 51 && c <= 67) cond_tag = "RAIN";
-        else if (c >= 71 && c <= 77) cond_tag = "SNOW";
-        else if (c >= 80 && c <= 82) cond_tag = "SHWR";
-        else if (c >= 95) cond_tag = "STRM";
-    }
-    cv.drawRoundRect(96, 6 + offsetY, 26, 11, 2, TFT_WHITE);
-    cv.setTextColor(TFT_WHITE, TFT_BLACK);
-    cv.setTextSize(1);
-    cv.setCursor(100, 8 + offsetY);
-    cv.print(cond_tag);
+    /* Rounded Clock Box Dimensions and Position (matching clock frame) */
+    int box_w = 104;
+    int box_h = 28;
+    int radius = 4;
+    int box_x = (OLED_PANEL_WIDTH_PX - box_w) / 2;
+    int box_y = 18 + offsetY;
 
-    /* Separator line framing status header */
-    cv.drawFastHLine(6, 23 + offsetY, OLED_PANEL_WIDTH_PX - 12, TFT_WHITE);
-    cv.drawPixel(6, 22 + offsetY, TFT_WHITE);
-    cv.drawPixel(OLED_PANEL_WIDTH_PX - 7, 22 + offsetY, TFT_WHITE);
+    /* 1. Base 1px Rounded Rectangle Border (Black) */
+    cv.drawRoundRect(box_x, box_y, box_w, box_h, radius, TFT_BLACK);
 
-    /* Left Column: Animated weather illustration */
-    draw_weather_glyph(cv, weather.weather_code, 20, 42 + offsetY, animFrame);
+    /* 2. 3D Retro Shadow / Beveled Frame: Thick Top & Right border (2px) */
+    cv.drawFastHLine(box_x + 2, box_y + 1, box_w - 4, TFT_BLACK);
+    cv.drawFastVLine(box_x + box_w - 2, box_y + 2, box_h - 4, TFT_BLACK);
+    cv.drawPixel(box_x + box_w - 2, box_y + 1, TFT_BLACK);
+    cv.drawPixel(box_x + 1, box_y + 1, TFT_BLACK);
 
-    /* Vertical divider separating icon from metrics */
-    cv.drawFastVLine(38, 26 + offsetY, 34, TFT_WHITE);
+    /* Inside Box - Left: Animated Weather Glyph (vertically centered at box_y + 14) */
+    draw_weather_glyph(cv, weather.valid ? weather.weather_code : 0, box_x + 18, box_y + 14, animFrame, TFT_BLACK);
 
-    /* Right Column: Big Temperature */
+    /* Inside Box - Right: Big Temperature */
     char temp_buf[12];
     if (weather.valid) {
         snprintf(temp_buf, sizeof(temp_buf), "%.1f", weather.temperature);
@@ -341,70 +319,58 @@ void renderWeatherToCanvas(const WeatherInfo& weather, float animFrame, int offs
     }
 
     cv.setTextSize(2);
-    cv.setTextColor(TFT_WHITE, TFT_BLACK);
-    cv.setCursor(43, 24 + offsetY);
+    cv.setTextColor(TFT_BLACK, TFT_WHITE);
+    cv.setCursor(box_x + 36, box_y + 7);
     cv.print(temp_buf);
 
-    int deg_x = 43 + strlen(temp_buf) * 12 + 2;
-    cv.drawCircle(deg_x + 2, 25 + offsetY, 2, TFT_WHITE);
+    int deg_x = box_x + 36 + (int)strlen(temp_buf) * 12 + 2;
+    cv.drawCircle(deg_x + 2, box_y + 8, 2, TFT_BLACK);
     cv.setTextSize(1);
-    cv.setCursor(deg_x + 7, 27 + offsetY);
+    cv.setCursor(deg_x + 7, box_y + 10);
     cv.print("C");
 
-    /* Right Column: City Name */
-    cv.setTextSize(1);
-    cv.setCursor(43, 42 + offsetY);
-    char city_display[16];
-    if (weather.valid && weather.city[0] != '\0') {
-        strncpy(city_display, weather.city, sizeof(city_display) - 1);
-        city_display[sizeof(city_display) - 1] = '\0';
-    } else {
-        strncpy(city_display, "Weather", sizeof(city_display));
-    }
-    cv.print(city_display);
-
-    /* Right Column: Dual Metric Capsules (Humidity & Sun Times) */
-    cv.drawPixel(45, 53 + offsetY, TFT_WHITE);
-    cv.drawLine(44, 54 + offsetY, 46, 54 + offsetY, TFT_WHITE);
-    cv.fillRect(43, 55 + offsetY, 5, 3, TFT_WHITE);
-    cv.drawPixel(44, 58 + offsetY, TFT_WHITE);
-    cv.drawPixel(46, 58 + offsetY, TFT_WHITE);
-
-    cv.setCursor(51, 53 + offsetY);
+    /* Bottom Line: Weather Condition & Humidity or Sun Ephemeris */
+    const char* cond_str = "Normal";
     if (weather.valid) {
-        cv.printf("%d%%", weather.humidity);
-    } else {
-        cv.print("--%");
+        int c = weather.weather_code;
+        if (c == 0 || c == 1) cond_str = "Cerah";
+        else if (c == 2) cond_str = "Cerah Berawan";
+        else if (c == 3) cond_str = "Mendung";
+        else if (c == 45 || c == 48) cond_str = "Kabut";
+        else if (c >= 51 && c <= 57) cond_str = "Gerimis";
+        else if (c >= 61 && c <= 67) cond_str = "Hujan";
+        else if (c >= 71 && c <= 77) cond_str = "Bersalju";
+        else if (c >= 80 && c <= 82) cond_str = "Hujan Ringan";
+        else if (c >= 85 && c <= 86) cond_str = "Hujan Salju";
+        else if (c >= 95) cond_str = "Hujan Badai";
+        else cond_str = "Berawan";
     }
 
-    cv.setCursor(84, 53 + offsetY);
-    if (weather.valid && weather.sun_times_valid) {
-        bool show_sunset = ((int)(animFrame * 0.4f) % 2 == 1);
-        if (show_sunset) {
-            cv.printf("v%02d:%02d", weather.sunset_hour, weather.sunset_min);
+    char sub_buf[32];
+    if (weather.valid) {
+        if (weather.sun_times_valid && ((int)(animFrame * 0.4f) % 2 == 1)) {
+            snprintf(sub_buf, sizeof(sub_buf), "^%02d:%02d  v%02d:%02d",
+                     weather.sunrise_hour, weather.sunrise_min,
+                     weather.sunset_hour, weather.sunset_min);
         } else {
-            cv.printf("^%02d:%02d", weather.sunrise_hour, weather.sunrise_min);
+            snprintf(sub_buf, sizeof(sub_buf), "%s * %d%%", cond_str, weather.humidity);
         }
     } else {
-        cv.print("Live");
+        snprintf(sub_buf, sizeof(sub_buf), "Memuat Cuaca...");
     }
+
+    cv.setTextSize(1);
+    cv.setTextColor(TFT_BLACK, TFT_WHITE);
+    int sub_x = (OLED_PANEL_WIDTH_PX - (int)strlen(sub_buf) * 6) / 2;
+    if (sub_x < 2) sub_x = 2;
+    cv.setCursor(sub_x, 51 + offsetY);
+    cv.print(sub_buf);
 }
 
 void drawWeatherScreen(const WeatherInfo& weather, float animFrame) {
     LGFX_Sprite& cv = *s_ambient_canvas;
-    cv.fillScreen(TFT_BLACK);
     int burn_y = get_burn_shift_y();
 
-    /* Hybrid top zone: Living companion eyes reacting to weather */
-    Expression wExpr = EXPR_IDLE;
-    if (weather.valid) {
-        if (weather.weather_code == 0 || weather.weather_code == 1) {
-            wExpr = EXPR_HAPPY;
-        }
-    }
-    drawMiniFace(wExpr, g_blinkEyeHeight, g_currentOffsetX * 0.35f, g_currentOffsetY * 0.35f, 0.5f);
-
-    /* Hybrid bottom zone: Weather Forecast */
     renderWeatherToCanvas(weather, animFrame, burn_y);
     cv.pushSprite(0, 0);
 }
@@ -734,9 +700,11 @@ void transitionToAmbient(AmbientScreenMode toMode, float durationMs) {
             int offsetY = (int)roundf((1.0f - bounceT) * 38.0f);
 
             cv.fillScreen(TFT_BLACK);
-            Expression miniExpr = (toMode == AMBIENT_NOTIFICATION) ? EXPR_HAPPY : startExpr;
-            drawMiniFace(miniExpr, 1.0f, g_currentOffsetX * 0.35f, g_currentOffsetY * 0.35f, 0.5f);
-            cv.drawFastHLine(6, 23 + offsetY, OLED_PANEL_WIDTH_PX - 12, TFT_WHITE);
+            if (toMode != AMBIENT_CLOCK && toMode != AMBIENT_WEATHER) {
+                Expression miniExpr = (toMode == AMBIENT_NOTIFICATION) ? EXPR_HAPPY : startExpr;
+                drawMiniFace(miniExpr, 1.0f, g_currentOffsetX * 0.35f, g_currentOffsetY * 0.35f, 0.5f);
+                cv.drawFastHLine(6, 23 + offsetY, OLED_PANEL_WIDTH_PX - 12, TFT_WHITE);
+            }
 
             if (toMode == AMBIENT_CLOCK) {
                 renderClockToCanvas(g_animFrame, offsetY);
@@ -792,8 +760,10 @@ void transitionFromAmbientToFace(AmbientScreenMode fromMode, Expression toExpr, 
             int offsetY = (int)roundf((p * p) * 38.0f);
 
             cv.fillScreen(TFT_BLACK);
-            drawMiniFace(toExpr, 1.0f, g_currentOffsetX * 0.35f, g_currentOffsetY * 0.35f, 0.5f);
-            cv.drawFastHLine(6, 23 + offsetY, OLED_PANEL_WIDTH_PX - 12, TFT_WHITE);
+            if (fromMode != AMBIENT_CLOCK && fromMode != AMBIENT_WEATHER) {
+                drawMiniFace(toExpr, 1.0f, g_currentOffsetX * 0.35f, g_currentOffsetY * 0.35f, 0.5f);
+                cv.drawFastHLine(6, 23 + offsetY, OLED_PANEL_WIDTH_PX - 12, TFT_WHITE);
+            }
 
             if (fromMode == AMBIENT_CLOCK) {
                 renderClockToCanvas(g_animFrame, offsetY);

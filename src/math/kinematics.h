@@ -39,6 +39,13 @@ float getAffectiveEyeScaleX(void);
 float getAffectiveEyeScaleY(void);
 float getOcularVergence(void);
 
+/* Biomechanical Drowsy Palpebral Dynamics & Sleep-Struggle Physical Law */
+void updateDrowsyEyelidKinematics(float dt_sec, float sleep_pressure, float volitional_will, float droop_target);
+float getDrowsyAperture(void);
+float getDrowsyNodOffsetY(void);
+bool isDrowsyStruggleActive(void);
+void resetDrowsyEyelidState(void);
+
 #ifdef __cplusplus
 }
 #endif

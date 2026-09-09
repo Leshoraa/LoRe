@@ -44,7 +44,7 @@
 
 - **60 FPS Biomechanical Kinematics**: Flash & Hogan 5th-order minimum-jerk saccade trajectory generation coupled with an underdamped second-order ocular mass-spring-damper system ($\omega_n = 32.0\text{ rad/s}, \zeta = 0.72$).
 - **Continuous Superellipse (Formula Lamé) Soma Morphology**: Real-time 60 FPS parametric ocular rendering ($|x/a|^n + |y/b|^n \le 1$), enabling LoRe to continuously actuate eye width, height, corner curvature exponent, hollow/solid stroke, asymmetric tilt, and physical OLED hardware contrast.
-- **Autonomic Brainstem CPG**: Matsuoka coupled non-linear neural oscillators producing endogenously driven respiration, homeostatic motor strain accumulation/discharge, and spontaneous biological agency.
+- **Autonomic Brainstem CPG & Sleep-Struggle Kinetics**: Matsuoka coupled non-linear neural oscillators paired with continuous palpebral droop physics and volitional struggle snaps ("merem setengah" and fighting to stay awake), producing spontaneous biological agency.
 - **Physiological Micro-Nystagmus**: Continuous sub-pixel Langevin Brownian fluctuations coupled to ocular motor output for lifelike organic micro-tremor.
 - **Russell Circumplex Affective Engine**: Stochastic Langevin diffusion across valence-arousal emotional state space coupled with autonomic vitality.
 - **On-Device TinyML Micro-Brain**: 5 homeostatic drives (*Curiosity*, *Social*, *Boredom*, *Fatigue*, *Mischief*) coupled to Markov action selection and circadian energy cycles.
@@ -91,7 +91,7 @@
 | - Ocular Dynamics (32.0 rad/s Underdamped Mass-Spring-Damper, zeta = 0.72)      |
 | - 5th-Order Minimum-Jerk Saccades (Flash & Hogan Formulation)                   |
 | - Fixation Micro-Kinetics (Mean-Reverting Brownian Random Walk)                 |
-| - Non-Blocking Eyelid State Machine (Idle -> Closing -> Closed Dwell -> Opening -> Blink-Chain / Drowsy Doze)|
+| - Non-Blocking Eyelid & Sleep-Struggle State Machine (Idle -> Droop -> Hover -> Snap -> Effort -> Doze)  |
 | - OLED Anti-Burn-In Protection (+/-1 px Micro-Shift during Standby)             |
 | - Ambient Screens (Clock, Open-Meteo Weather, Push Notification, Turn-by-Turn)   |
 | - LovyanGFX 1-Bit Monochrome Sprite Renderer (1.0 MHz Fast-Mode Plus I2C Bus)   |
