@@ -72,6 +72,47 @@ int main() {
     assert(has_spontaneous_trigger);
     std::cout << "[PASS] Spontaneous autonomic volition / tension discharge verified." << std::endl;
 
+    /* Test 2: High Valence Duchenne smile horizontal squinting */
+    AutonomicAffectiveContext happy_ctx = {};
+    happy_ctx.valence = 0.85f;
+    happy_ctx.arousal = 0.50f;
+    setAutonomicAffectiveContext(&happy_ctx);
+    for (int i = 0; i < 60; ++i) updateAutonomicEngine(dt);
+    OcularSomaState soma_happy = getOcularSomaState();
+    assert(soma_happy.left_h < 30.0f);
+    assert(std::fabs(soma_happy.tilt_left) < 1e-4f);
+    assert(std::fabs(soma_happy.tilt_right) < 1e-4f);
+    std::cout << "[PASS] Affective Duchenne smile horizontal squint verified: h = " << soma_happy.left_h << ", tilt = 0.0" << std::endl;
+
+    /* Test 3: Fatigue-driven palpebral drowsy squint */
+    AutonomicAffectiveContext tired_ctx = {};
+    tired_ctx.fatigue = 0.90f;
+    setAutonomicAffectiveContext(&tired_ctx);
+    for (int i = 0; i < 60; ++i) updateAutonomicEngine(dt);
+    OcularSomaState soma_tired = getOcularSomaState();
+    assert(soma_tired.left_h < 26.0f);
+    std::cout << "[PASS] Fatigue-driven palpebral drowsy squint verified: h = " << soma_tired.left_h << std::endl;
+
+    /* Test 4: High arousal surprise widening and oval curvature */
+    AutonomicAffectiveContext surprise_ctx = {};
+    surprise_ctx.arousal = 0.90f;
+    setAutonomicAffectiveContext(&surprise_ctx);
+    for (int i = 0; i < 60; ++i) updateAutonomicEngine(dt);
+    OcularSomaState soma_surprise = getOcularSomaState();
+    assert(soma_surprise.left_w > 32.0f);
+    assert(soma_surprise.left_n < 3.2f);
+    std::cout << "[PASS] High arousal ocular widening & oval rounding verified: w = " << soma_surprise.left_w << ", n = " << soma_surprise.left_n << std::endl;
+
+    /* Test 5: Mischief asymmetrical one-eye sly wink/squint */
+    AutonomicAffectiveContext mischief_ctx = {};
+    mischief_ctx.mischief = 0.85f;
+    setAutonomicAffectiveContext(&mischief_ctx);
+    for (int i = 0; i < 60; ++i) updateAutonomicEngine(dt);
+    OcularSomaState soma_mischief = getOcularSomaState();
+    assert(soma_mischief.left_h < soma_mischief.right_h);
+    assert(std::fabs(soma_mischief.tilt_left) < 1e-4f && std::fabs(soma_mischief.tilt_right) < 1e-4f);
+    std::cout << "[PASS] Mischief asymmetrical sly wink/squint verified: left_h = " << soma_mischief.left_h << ", right_h = " << soma_mischief.right_h << std::endl;
+
     std::cout << "[PASS] All Autonomic Engine tests passed successfully." << std::endl;
     return 0;
 }
