@@ -8,6 +8,10 @@
 #include <cassert>
 #include <cmath>
 
+/* Standalone test definitions for global ocular gaze offsets */
+float g_currentOffsetX = 0.0f;
+float g_currentOffsetY = 0.0f;
+
 int main() {
     std::cout << "[TEST] Running Autonomic Engine & Matsuoka CPG validation tests..." << std::endl;
 
@@ -71,6 +75,30 @@ int main() {
     /* Assert that motor tension accumulation discharged at least once */
     assert(has_spontaneous_trigger);
     std::cout << "[PASS] Spontaneous autonomic volition / tension discharge verified." << std::endl;
+
+    /* Verify Listing's Law Axial Torsion on diagonal eccentric gaze */
+    g_currentOffsetX = 14.0f;
+    g_currentOffsetY = 8.0f;
+    updateAutonomicEngine(dt);
+    OcularSomaState soma_diag = getOcularSomaState();
+    assert(soma_diag.tilt_left > 0.015f && soma_diag.tilt_left < 0.045f);
+    assert(std::fabs(soma_diag.tilt_left - soma_diag.tilt_right) < 1e-6f);
+
+    /* Negative diagonal quadrant produces inverted torsion */
+    g_currentOffsetX = -14.0f;
+    g_currentOffsetY = 8.0f;
+    updateAutonomicEngine(dt);
+    OcularSomaState soma_diag_inv = getOcularSomaState();
+    assert(soma_diag_inv.tilt_left < -0.015f && soma_diag_inv.tilt_left > -0.045f);
+
+    /* Cardinal primary gaze (0, 0) yields zero torsional tilt */
+    g_currentOffsetX = 0.0f;
+    g_currentOffsetY = 0.0f;
+    updateAutonomicEngine(dt);
+    OcularSomaState soma_primary = getOcularSomaState();
+    assert(std::fabs(soma_primary.tilt_left) < 1e-6f);
+    assert(std::fabs(soma_primary.tilt_right) < 1e-6f);
+    std::cout << "[PASS] Listing's Law axial torsion kinematics verified across primary and tertiary quadrants." << std::endl;
 
     std::cout << "[PASS] All Autonomic Engine tests passed successfully." << std::endl;
     return 0;

@@ -55,6 +55,7 @@ float getVolitionalVigilance(void);
 float getBiologicalDroopAperture(void);
 bool sampleMicroSleepDecision(void);
 float getBiologicalDozeDurationMs(void);
+float getBrainCuriosityDrive(void);
 
 #ifdef __cplusplus
 }

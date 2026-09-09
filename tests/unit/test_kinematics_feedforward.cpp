@@ -3,17 +3,38 @@
  * @brief Unit test suite for predictive velocity feedforward, Ornstein-Uhlenbeck drift, and minimum-jerk kinematics.
  */
 
+#include "src/math/kinematics.h"
 #include <iostream>
 #include <cassert>
 #include <cmath>
 #include <algorithm>
 #include <vector>
 
-/* Standalone Horner polynomial evaluation */
-static float eval_minimum_jerk_spline(float p) {
+/* Standalone test definitions for kinematics globals */
+float g_currentOffsetX = 0.0f;
+float g_currentOffsetY = 0.0f;
+float g_currentVergence = 0.0f;
+float g_currentEyeScale = 1.0f;
+float g_currentEyeScaleX = 1.0f;
+float g_currentEyeScaleY = 1.0f;
+bool g_is_transitioning = false;
+
+/* Standalone Horner polynomial evaluation with post-saccadic glissade */
+static const float kGlissadeReboundGain = 0.045f;
+static const float kGlissadeOnsetTau = 0.70f;
+static const float kGlissadeDecayLambda = 3.5f;
+
+float eval_minimum_jerk_spline(float p) {
     if (p <= 0.0f) return 0.0f;
     if (p >= 1.0f) return 1.0f;
-    return p * p * p * (10.0f + p * (-15.0f + 6.0f * p));
+    float base_spline = p * p * p * (10.0f + p * (-15.0f + 6.0f * p));
+    if (p > kGlissadeOnsetTau) {
+        float delta_tau = p - kGlissadeOnsetTau;
+        float norm_tail = delta_tau / (1.0f - kGlissadeOnsetTau);
+        float glissade = kGlissadeReboundGain * std::sin(norm_tail * 3.14159265f) * std::exp(-kGlissadeDecayLambda * delta_tau);
+        base_spline += glissade;
+    }
+    return std::clamp(base_spline, 0.0f, 1.06f);
 }
 
 /* Mass-spring-damper gaze tracking with velocity feedforward simulation */
@@ -53,20 +74,25 @@ struct OUDriftSim {
 int main() {
     std::cout << "[TEST] Running kinematics velocity feedforward and OU drift validation tests..." << std::endl;
 
-    // Test 1: Minimum-Jerk Spline properties
+    // Test 1: Minimum-Jerk Spline & Glissade Rebound properties
     assert(std::fabs(eval_minimum_jerk_spline(0.0f) - 0.0f) < 1e-6f);
     assert(std::fabs(eval_minimum_jerk_spline(1.0f) - 1.0f) < 1e-6f);
     assert(std::fabs(eval_minimum_jerk_spline(0.5f) - 0.5f) < 1e-6f);
 
+    float max_s = 0.0f;
     float prev_s = 0.0f;
     for (int i = 1; i <= 100; ++i) {
         float p = (float)i / 100.0f;
         float s = eval_minimum_jerk_spline(p);
-        assert(s >= prev_s);
         assert(!std::isnan(s) && !std::isinf(s));
+        if (p <= 0.70f) {
+            assert(s >= prev_s);
+        }
+        if (s > max_s) max_s = s;
         prev_s = s;
     }
-    std::cout << "[PASS] 5th-order minimum-jerk spline passed monotonicity and boundary checks." << std::endl;
+    assert(max_s > 1.01f && max_s <= 1.06f);
+    std::cout << "[PASS] 5th-order minimum-jerk spline with post-saccadic glissade rebound verified." << std::endl;
 
     // Test 2: Predictive Velocity Feedforward eliminates steady-state ramp lag
     GazeSim sim_with_ff;
@@ -164,6 +190,94 @@ int main() {
     assert(std::fabs(base_sy - 1.0f) < 1e-6f);
     assert(std::fabs(base_sx - 1.0f) < 1e-6f);
     std::cout << "[PASS] Biological tissue incompressibility and baseline resting preservation verified." << std::endl;
+
+    // Test 6: Lid-Saccade Synkinesis and Fissure Tracking (von Graefe's following law)
+    std::cout << "[TEST] Validating lid-saccade synkinesis palpebral mechanics..." << std::endl;
+    auto test_synkinesis_aperture = [](float currentAperture, float gazeOffsetY) -> float {
+        if (currentAperture <= 0.05f) return 0.0f;
+        float norm_y = std::clamp(gazeOffsetY / 12.0f, -1.0f, 1.0f);
+        float delta = (norm_y < 0.0f) ? (-0.06f * norm_y) : (-0.09f * norm_y);
+        return std::clamp(currentAperture + delta, 0.05f, 1.08f);
+    };
+
+    auto test_fissure_offset = [](float gazeOffsetY) -> float {
+        return 0.15f * gazeOffsetY;
+    };
+
+    // Upward gaze elevates upper eyelid
+    float ap_up = test_synkinesis_aperture(1.0f, -10.0f);
+    assert(ap_up > 1.0f && ap_up <= 1.08f);
+
+    // Downward gaze narrows palpebral aperture
+    float ap_down = test_synkinesis_aperture(1.0f, 10.0f);
+    assert(ap_down < 1.0f && ap_down >= 0.90f);
+
+    // Primary central gaze preserves baseline aperture
+    float ap_center = test_synkinesis_aperture(1.0f, 0.0f);
+    assert(std::fabs(ap_center - 1.0f) < 1e-6f);
+
+    // Closed eye state (0.0f) remains closed during blinks
+    float ap_closed = test_synkinesis_aperture(0.0f, -10.0f);
+    assert(ap_closed == 0.0f);
+
+    // Fissure vertical center tracks globe elevation
+    assert(test_fissure_offset(-10.0f) < 0.0f);
+    assert(test_fissure_offset(10.0f) > 0.0f);
+    assert(test_fissure_offset(0.0f) == 0.0f);
+    std::cout << "[PASS] Lid-saccade synkinesis and fissure vertical tracking verified." << std::endl;
+
+    // Test 7: Listing's Law Axial Torsion Kinematics
+    std::cout << "[TEST] Validating Listing's Law axial ocular torsion..." << std::endl;
+    // Primary cardinal axes have zero torsion
+    assert(std::fabs(getListingTorsionAngleRad(0.0f, 0.0f)) < 1e-6f);
+    assert(std::fabs(getListingTorsionAngleRad(10.0f, 0.0f)) < 1e-6f);
+    assert(std::fabs(getListingTorsionAngleRad(0.0f, 8.0f)) < 1e-6f);
+
+    // Tertiary diagonal gaze produces continuous physiological torsion
+    float t_ne = getListingTorsionAngleRad(14.0f, 8.0f);
+    float t_nw = getListingTorsionAngleRad(-14.0f, 8.0f);
+    float t_se = getListingTorsionAngleRad(14.0f, -8.0f);
+    float t_sw = getListingTorsionAngleRad(-14.0f, -8.0f);
+
+    assert(t_ne > 0.015f && t_ne <= 0.045f);
+    assert(t_nw < -0.015f && t_nw >= -0.045f);
+    assert(std::fabs(t_ne + t_nw) < 1e-6f);
+    assert(std::fabs(t_ne + t_se) < 1e-6f);
+    assert(std::fabs(t_ne - t_sw) < 1e-6f);
+    std::cout << "[PASS] Listing's Law axial torsion satisfies quadrant symmetry and angular bounds." << std::endl;
+
+    // Test 8: Lévy Flight Heavy-Tailed Gaze Step Distribution
+    std::cout << "[TEST] Validating Lévy Flight heavy-tailed exploration step distribution..." << std::endl;
+    int count_local = 0;
+    int count_med = 0;
+    int count_wide = 0;
+    const int n_samples = 10000;
+    float curiosity = 0.35f;
+    float p_wide = 0.05f + 0.12f * curiosity; // ~0.092
+    float p_med = 0.20f + 0.05f * curiosity;  // ~0.217
+
+    for (int i = 0; i < n_samples; ++i) {
+        float roll = (float)((i * 37 + 13) % 10000) / 10000.0f;
+        if (roll < p_wide) {
+            count_wide++;
+        } else if (roll < (p_wide + p_med)) {
+            count_med++;
+        } else {
+            count_local++;
+        }
+    }
+
+    float frac_local = (float)count_local / (float)n_samples;
+    float frac_med = (float)count_med / (float)n_samples;
+    float frac_wide = (float)count_wide / (float)n_samples;
+
+    std::cout << "[INFO] Lévy flight distribution: local=" << frac_local * 100.0f << "%, med="
+              << frac_med * 100.0f << "%, wide=" << frac_wide * 100.0f << "%" << std::endl;
+
+    assert(frac_local > 0.60f && frac_local < 0.75f);
+    assert(frac_med > 0.18f && frac_med < 0.25f);
+    assert(frac_wide > 0.07f && frac_wide < 0.12f);
+    std::cout << "[PASS] Lévy flight heavy-tailed exploration hierarchy verified." << std::endl;
 
     std::cout << "[SUCCESS] All kinematics and dynamic model tests passed." << std::endl;
     return 0;

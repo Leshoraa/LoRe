@@ -46,6 +46,25 @@ float getDrowsyNodOffsetY(void);
 bool isDrowsyStruggleActive(void);
 void resetDrowsyEyelidState(void);
 
+/* Biomechanical Ocular Naturalization: Lid-Saccade Synkinesis & Listing's Law */
+float getLidSaccadeSynkinesisAperture(float currentAperture, float gazeOffsetY);
+float getLidSaccadeFissureOffsetY(float gazeOffsetY);
+
+static inline float getListingTorsionAngleRad(float gazeOffsetX, float gazeOffsetY) {
+    const float kListingMaxOffsetX = 17.5f;
+    const float kListingMaxOffsetY = 12.0f;
+    const float kListingTorsionGainRad = 0.045f; /* ~2.6 degrees max biomechanical tilt */
+
+    float norm_x = gazeOffsetX / kListingMaxOffsetX;
+    float norm_y = gazeOffsetY / kListingMaxOffsetY;
+    if (norm_x < -1.0f) norm_x = -1.0f;
+    if (norm_x > 1.0f) norm_x = 1.0f;
+    if (norm_y < -1.0f) norm_y = -1.0f;
+    if (norm_y > 1.0f) norm_y = 1.0f;
+
+    return kListingTorsionGainRad * (norm_x * norm_y);
+}
+
 #ifdef __cplusplus
 }
 #endif

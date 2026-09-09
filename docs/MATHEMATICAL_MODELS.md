@@ -203,3 +203,47 @@ $$\left|\frac{(x - x_c)\cos\theta + (y - y_c)\sin\theta}{a}\right|^n + \left|\fr
 - **Stroke Mode:** Solid fill ($t = 0$) or hollow wireframe ($t = 1.5\text{ px}$) during deep contemplation / low energy.
 - **Hardware OLED Contrast Actuation:**
   $$C_{\text{hardware}} = \mathrm{clamp}(40 + \mathrm{round}(175.0 \cdot E_{\text{metabolic}} + 25.0 \cdot [u_1]^+), \ 30, \ 255)$$
+
+---
+
+## 10. Biological Free Gaze Naturalization, Listing's Law & Ocular Micro-Dynamics
+
+To eliminate mechanical stiffness during free autonomous idling and make gaze motion biologically grounded, six continuous physical laws operate in concert:
+
+### 10.1 Lid-Saccade Synkinesis & Fissure Tracking (von Graefe's Following Law)
+Due to shared innervation of the *levator palpebrae superioris* and *superior rectus* muscles, the upper eyelid aperture follows vertical ocular movement ($Y_{\text{gaze}} \in [-12.0, +11.0]\text{ px}$):
+$$\Delta h_{\text{synkinesis}} = \begin{cases} -k_{\text{up}} \cdot \left(\frac{Y_{\text{gaze}}}{Y_{\text{max}}}\right), & Y_{\text{gaze}} < 0 \quad (\text{upward gaze elevation, } k_{\text{up}} = 0.06) \\ -k_{\text{down}} \cdot \left(\frac{Y_{\text{gaze}}}{Y_{\text{max}}}\right), & Y_{\text{gaze}} \ge 0 \quad (\text{downward lid following, } k_{\text{down}} = 0.09) \end{cases}$$
+$$h_{\text{render}} = \mathrm{clamp}(h_{\text{current}} + \Delta h_{\text{synkinesis}}, \ 0.05, \ 1.08) \quad (\text{if } h_{\text{current}} > 0.05)$$
+
+The palpebral fissure vertical center also tracks globe displacement:
+$$y_{\text{fissure}} = k_{\text{fissure}} \cdot Y_{\text{gaze}} \quad (k_{\text{fissure}} = 0.15)$$
+
+### 10.2 Post-Saccadic Elastic Glissade Rebound
+Ballistic eye movements terminate with underdamped soft-tissue compliance upon target arrival ($\tau > \tau_{\text{onset}} = 0.70$):
+$$s(\tau) = (10\tau^3 - 15\tau^4 + 6\tau^5) + A_{\text{glissade}} \cdot \sin\left(\pi \frac{\tau - 0.70}{0.30}\right) \cdot e^{-\lambda (\tau - 0.70)} \cdot \mathbf{1}_{\tau > 0.70}$$
+where $A_{\text{glissade}} = 0.045$, $\lambda = 3.5$. This produces a subtle $2.5\%$ elastic overshoot and damped recovery that smoothly lands at exactly $1.000$ at $\tau = 1.00$.
+
+### 10.3 Fixational Ornstein-Uhlenbeck Drift & Involuntary Microsaccades
+Between saccades, the eye does not freeze; it undergoes bounded stochastic drift anchored to the target focal coordinate $(x^*, y^*)$:
+$$d\mathbf{x}_{\text{drift}} = -\theta_{\text{ou}} (\mathbf{x} - \mathbf{x}^*) dt + \sigma_{\text{ou}} \sqrt{dt} \, \mathbf{W}_t \quad (\theta_{\text{ou}} = 2.8\text{ s}^{-1}, \ \sigma_{\text{ou}} = 0.18\text{ px}/\sqrt{\text{s}})$$
+
+When retinal drift error $|\mathbf{x} - \mathbf{x}^*| \ge 0.25\text{ px}$ after an interval $T \sim \mathcal{U}(1.2, 2.5)\text{ s}$, an involuntary $28\text{ ms}$ microsaccadic flick recenters the foveal gaze to prevent Troxler photoreceptor bleaching.
+
+### 10.4 Lévy Flight Free Gaze Exploration
+Free exploration saccades follow a scale-invariant heavy-tailed Pareto distribution:
+- **Local Inspection Clusters ($r \in [0.5, 3.5]\text{ px}$):** $\approx 70\%$ probability.
+- **Intermediate Focal Shifts ($r \in [4.0, 8.5]\text{ px}$):** $\approx 20\%$ probability.
+- **Wide Exploratory Leaps ($r \in [9.5, 15.0]\text{ px}$):** $P_{\text{wide}} = 0.05 + 0.12 \cdot C_{\text{curiosity}}$, dynamically expanding with the internal TinyML Curiosity drive.
+
+Step vectors are projected isotropically: $\Delta \mathbf{x} = [r \cos\phi, \ r \sin\phi]^T$ with soft reflective boundaries.
+
+### 10.5 Listing's Law Axial Ocular Torsion
+In tertiary (diagonal) gaze, the eye undergoes torsional rotation around the line of sight according to Listing's plane kinematics:
+$$\theta_{\text{torsion}} = k_{\text{listing}} \cdot \frac{X_{\text{gaze}} \cdot Y_{\text{gaze}}}{X_{\text{max}} \cdot Y_{\text{max}}} \quad (k_{\text{listing}} = 0.045\text{ rad} \approx 2.6^\circ)$$
+Applied symmetrically to superellipse `tilt_left` and `tilt_right`. Pure cardinal gazes produce zero torsional rotation ($\theta = 0$).
+
+### 10.6 Hippus & Cardiorespiratory Vitality Pulse
+Continuous vegetative vitality pulses through the superellipse dimensions via direct coupling to the Matsuoka CPG respiratory drive:
+$$S_{\text{hippus}} = 1.0 + k_{\text{resp}} \cdot y_{\text{resp}} + k_{\text{tonic}} \cdot (E_{\text{metabolic}} - 0.50)$$
+where $k_{\text{resp}} = 0.022$ ($\pm 2.2\%$ breathing expansion) and $k_{\text{tonic}} = 0.018$.
+

@@ -518,8 +518,13 @@ void oledTask(void* pvParameters) {
                 /* Biomechanical head-droop nod (+2.0 px to +3.5 px downward offset) when nodding off,
                  * dynamically coupled to physical sleep struggle and micro-sleep dozes */
                 float nodY = s_is_drowsy_doze ? (2.0f + 1.5f * getBiologicalSleepPressure()) : getDrowsyNodOffsetY();
-                float renderOffsetY = g_currentOffsetY + nodY;
-                drawFace(g_currentExpr, g_blinkEyeHeight, g_currentOffsetX, renderOffsetY, g_animFrame, g_currentVergence, g_currentEyeScale);
+                float fissureY = getLidSaccadeFissureOffsetY(g_currentOffsetY);
+                float renderOffsetY = g_currentOffsetY + nodY + fissureY;
+
+                /* Lid-saccade synkinesis (von Graefe's following law): palpebral aperture tracks vertical gaze */
+                float renderAperture = getLidSaccadeSynkinesisAperture(g_blinkEyeHeight, g_currentOffsetY);
+
+                drawFace(g_currentExpr, renderAperture, g_currentOffsetX, renderOffsetY, g_animFrame, g_currentVergence, g_currentEyeScale);
             }
         }
 

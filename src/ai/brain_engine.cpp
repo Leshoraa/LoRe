@@ -463,3 +463,9 @@ float getBiologicalDozeDurationMs(void) {
      * 800 ms (light microsleep) up to 2200 ms (heavy exhaustion doze) */
     return 800.0f + 1400.0f * pressure;
 }
+
+float getBrainCuriosityDrive(void) {
+    /* Expose current homeostatic curiosity drive for exploratory ocular Lévy flight modulation */
+    return s_drives.curiosity;
+}
+

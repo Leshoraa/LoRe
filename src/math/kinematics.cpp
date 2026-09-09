@@ -44,6 +44,40 @@ static unsigned long s_gazeDuration = 120;
 static unsigned long s_nextGazeTime = 0;
 static bool s_inSaccade = false;
 
+/* Fixational Microsaccade State & Constants */
+static uint32_t s_nextMicrosaccadeTime = 0;
+static bool s_inMicrosaccade = false;
+static uint32_t s_microsaccadeStartTime = 0;
+static float s_microsaccadeStartX = 0.0f;
+static float s_microsaccadeStartY = 0.0f;
+static float s_microsaccadeTargetX = 0.0f;
+static float s_microsaccadeTargetY = 0.0f;
+
+static const float kOUMeanReversionRate = 2.8f;      /* Mean-reversion pull toward gaze anchor */
+static const float kOUVolatilitySigma = 0.18f;        /* Stochastic diffusion amplitude */
+static const uint32_t kMicrosaccadeDurationMs = 28;  /* Rapid biological flick duration */
+static const float kMicrosaccadeThresholdPx = 0.25f;  /* Retinal drift error threshold */
+static const uint32_t kMicrosaccadeIntervalMinMs = 1200;
+static const uint32_t kMicrosaccadeIntervalRangeMs = 1300;
+
+/* Lévy Flight Heavy-Tailed Gaze Exploration Constants */
+static const float kLevyWideBaseProb = 0.05f;
+static const float kLevyWideCuriosityGain = 0.12f;
+static const float kLevyMedBaseProb = 0.20f;
+static const float kLevyMedCuriosityGain = 0.05f;
+static const float kLevyLocalMinRadiusPx = 0.5f;
+static const float kLevyLocalMaxRadiusPx = 3.5f;
+static const float kLevyMediumMinRadiusPx = 4.0f;
+static const float kLevyMediumMaxRadiusPx = 8.5f;
+static const float kLevyWideMinRadiusPx = 9.5f;
+static const float kLevyWideMaxRadiusPx = 15.0f;
+
+/* Post-Saccadic Ocular Glissade Constants (Extraocular Soft-Tissue Compliance) */
+static const float kGlissadeReboundGain = GLISSADE_REBOUND_GAIN;
+static const float kGlissadeOnsetTau = 0.70f;
+static const float kGlissadeDecayLambda = 3.5f;
+static const float kGlissadeMaxOvershoot = 1.06f;
+
 static bool s_prevTargetDetected = false;
 static float s_deadbandTargetX = 0.0f;
 static float s_deadbandTargetY = 0.0f;
@@ -58,12 +92,13 @@ float eval_minimum_jerk_spline(float p) {
     if (p >= 1.0f) return 1.0f;
     float base_spline = p * p * p * (10.0f + p * (-15.0f + 6.0f * p));
     /* Post-saccadic ocular glissade rebound upon target landing */
-    if (p > 0.70f) {
-        float norm_tail = (p - 0.70f) / 0.30f;
-        float glissade = GLISSADE_REBOUND_GAIN * sinf(norm_tail * 3.14159265f) * expf(-3.5f * norm_tail);
+    if (p > kGlissadeOnsetTau) {
+        float delta_tau = p - kGlissadeOnsetTau;
+        float norm_tail = delta_tau / (1.0f - kGlissadeOnsetTau);
+        float glissade = kGlissadeReboundGain * sinf(norm_tail * 3.14159265f) * expf(-kGlissadeDecayLambda * delta_tau);
         base_spline += glissade;
     }
-    return constrain(base_spline, 0.0f, 1.06f);
+    return constrain(base_spline, 0.0f, kGlissadeMaxOvershoot);
 }
 
 uint32_t compute_saccade_duration_ms(float displacement_px) {
@@ -417,24 +452,42 @@ void updateGazeSystem(void) {
 
             uint32_t pick = esp_random() % 100;
             if (is_rain && (pick < 26)) {
-                /* Gaze gently upward toward sky/ceiling when raining */
+                /* Environmental reflex: gaze gently upward toward sky/ceiling during rain */
                 s_targetOffsetX = ((float)(esp_random() % 40) - 20.0f) * 0.1f;
                 s_targetOffsetY = -5.0f - (float)(esp_random() % 35) * 0.1f;
-            } else if (pick < 60) {
-                s_targetOffsetX = ((float)(esp_random() % 70) - 35.0f) * 0.1f;
-                s_targetOffsetY = ((float)(esp_random() % 40) - 20.0f) * 0.1f + y_bias * 0.5f;
-            } else if (pick < 88) {
-                float signX = (esp_random() % 2 == 0) ? -1.0f : 1.0f;
-                s_targetOffsetX = signX * (4.0f + (float)(esp_random() % 40) * 0.1f);
-                s_targetOffsetY = ((float)(esp_random() % 50) - 25.0f) * 0.1f + y_bias;
             } else {
-                float signX = (esp_random() % 2 == 0) ? -1.0f : 1.0f;
-                s_targetOffsetX = signX * (8.0f + (float)(esp_random() % 35) * 0.1f);
-                s_targetOffsetY = ((float)(esp_random() % 60) - 30.0f) * 0.1f + y_bias;
-            }
+                /* Lévy Flight Free Exploration: heavy-tailed step distribution modulated by curiosity */
+                float curiosity = getBrainCuriosityDrive();
+                float p_wide = kLevyWideBaseProb + kLevyWideCuriosityGain * curiosity;
+                float p_med = kLevyMedBaseProb + kLevyMedCuriosityGain * curiosity;
+                float roll = (float)(esp_random() % 1000) * 0.001f;
 
-            s_targetOffsetX = constrain(s_targetOffsetX, -14.0f, 14.0f);
-            s_targetOffsetY = constrain(s_targetOffsetY, -9.0f, 8.0f);
+                float step_radius = 0.0f;
+                if (roll < p_wide) {
+                    /* Long-range exploratory peripheral saccade */
+                    step_radius = kLevyWideMinRadiusPx + ((float)(esp_random() % 1000) * 0.001f) * (kLevyWideMaxRadiusPx - kLevyWideMinRadiusPx);
+                } else if (roll < (p_wide + p_med)) {
+                    /* Intermediate focal shift */
+                    step_radius = kLevyMediumMinRadiusPx + ((float)(esp_random() % 1000) * 0.001f) * (kLevyMediumMaxRadiusPx - kLevyMediumMinRadiusPx);
+                } else {
+                    /* Dense local inspection cluster */
+                    step_radius = kLevyLocalMinRadiusPx + ((float)(esp_random() % 1000) * 0.001f) * (kLevyLocalMaxRadiusPx - kLevyLocalMinRadiusPx);
+                }
+
+                /* Directional vector on unit circle [0, 2pi) */
+                float step_angle = ((float)(esp_random() % 6283) * 0.001f);
+                float candX = s_startOffsetX + step_radius * cosf(step_angle);
+                float candY = s_startOffsetY + step_radius * sinf(step_angle) + y_bias;
+
+                /* Soft reflective boundary to keep target within natural ocular envelope */
+                if (candX > 14.0f) candX = 14.0f - (candX - 14.0f);
+                if (candX < -14.0f) candX = -14.0f + (-14.0f - candX);
+                if (candY > 8.0f) candY = 8.0f - (candY - 8.0f);
+                if (candY < -9.0f) candY = -9.0f + (-9.0f - candY);
+
+                s_targetOffsetX = constrain(candX, -14.0f, 14.0f);
+                s_targetOffsetY = constrain(candY, -9.0f, 8.0f);
+            }
 
             float ds = sqrtf((s_targetOffsetX - s_startOffsetX) * (s_targetOffsetX - s_startOffsetX) +
                              (s_targetOffsetY - s_startOffsetY) * (s_targetOffsetY - s_startOffsetY));
@@ -457,6 +510,8 @@ void updateGazeSystem(void) {
             g_currentOffsetX = s_targetOffsetX;
             g_currentOffsetY = s_targetOffsetY;
             s_inSaccade = false;
+            s_nextMicrosaccadeTime = now + kMicrosaccadeIntervalMinMs + (esp_random() % kMicrosaccadeIntervalRangeMs);
+            s_inMicrosaccade = false;
         } else {
             float s = eval_minimum_jerk_spline(progress);
             float distX = s_targetOffsetX - s_startOffsetX;
@@ -465,16 +520,49 @@ void updateGazeSystem(void) {
             g_currentOffsetY = s_startOffsetY + (distY * s);
         }
     } else {
-        float u1 = ((float)(esp_random() % 1000) - 500.0f) * 0.001f;
-        float u2 = ((float)(esp_random() % 1000) - 500.0f) * 0.001f;
-        float drift_sigma = 0.03f * sqrtf(dt);
-        s_eye_vx += u1 * drift_sigma;
-        s_eye_vy += u2 * drift_sigma;
-        s_eye_vx *= 0.88f;
-        s_eye_vy *= 0.88f;
+        if (s_inMicrosaccade) {
+            float elapsed_micro = (float)(now - s_microsaccadeStartTime);
+            float prog_micro = elapsed_micro / (float)kMicrosaccadeDurationMs;
+            if (prog_micro >= 1.0f) {
+                g_currentOffsetX = s_microsaccadeTargetX;
+                g_currentOffsetY = s_microsaccadeTargetY;
+                s_inMicrosaccade = false;
+            } else {
+                float sm = easeInOutCubic(prog_micro);
+                g_currentOffsetX = s_microsaccadeStartX + (s_microsaccadeTargetX - s_microsaccadeStartX) * sm;
+                g_currentOffsetY = s_microsaccadeStartY + (s_microsaccadeTargetY - s_microsaccadeStartY) * sm;
+            }
+        } else {
+            /* Periodic anti-fading microsaccade trigger */
+            if (s_nextMicrosaccadeTime == 0) {
+                s_nextMicrosaccadeTime = now + kMicrosaccadeIntervalMinMs + (esp_random() % kMicrosaccadeIntervalRangeMs);
+            }
+            float errX = g_currentOffsetX - s_targetOffsetX;
+            float errY = g_currentOffsetY - s_targetOffsetY;
+            float distErr = sqrtf(errX * errX + errY * errY);
 
-        g_currentOffsetX += s_eye_vx;
-        g_currentOffsetY += s_eye_vy;
+            if (now >= s_nextMicrosaccadeTime && distErr >= kMicrosaccadeThresholdPx) {
+                s_inMicrosaccade = true;
+                s_microsaccadeStartTime = now;
+                s_microsaccadeStartX = g_currentOffsetX;
+                s_microsaccadeStartY = g_currentOffsetY;
+                /* Recenter to target anchor with sub-pixel landing jitter */
+                s_microsaccadeTargetX = s_targetOffsetX + ((float)(esp_random() % 100) - 50.0f) * 0.001f;
+                s_microsaccadeTargetY = s_targetOffsetY + ((float)(esp_random() % 100) - 50.0f) * 0.001f;
+                s_nextMicrosaccadeTime = now + kMicrosaccadeIntervalMinMs + (esp_random() % kMicrosaccadeIntervalRangeMs);
+            } else {
+                /* Ornstein-Uhlenbeck stochastic drift with mean reversion toward fixation target anchor */
+                float u1 = ((float)(esp_random() % 2000) - 1000.0f) * 0.001f;
+                float u2 = ((float)(esp_random() % 2000) - 1000.0f) * 0.001f;
+                float sq_dt = sqrtf(dt);
+
+                float d_drift_x = -kOUMeanReversionRate * errX * dt + kOUVolatilitySigma * sq_dt * u1;
+                float d_drift_y = -kOUMeanReversionRate * errY * dt + kOUVolatilitySigma * sq_dt * u2;
+
+                g_currentOffsetX += d_drift_x;
+                g_currentOffsetY += d_drift_y;
+            }
+        }
     }
 
     g_currentOffsetX = constrain(g_currentOffsetX, -17.5f, 17.5f);
@@ -491,6 +579,33 @@ float getAffectiveEyeScaleY(void) {
 
 float getOcularVergence(void) {
     return g_currentVergence;
+}
+
+/* Lid-Saccade Synkinesis Parameters (von Graefe's following law) */
+static const float kLidSynkinesisMaxGazeY = 12.0f;
+static const float kLidSynkinesisUpGain = 0.06f;    /* Palpebral widening during upward gaze */
+static const float kLidSynkinesisDownGain = 0.09f;  /* Palpebral narrowing following downward gaze */
+static const float kMinPalpebralSynkinesis = 0.05f; /* Preserve complete eyelid closure during blinks */
+static const float kMaxPalpebralSynkinesis = 1.08f;
+static const float kLidFissureTrackingGain = 0.15f; /* Fissure slit vertical following factor */
+
+float getLidSaccadeSynkinesisAperture(float currentAperture, float gazeOffsetY) {
+    if (currentAperture <= kMinPalpebralSynkinesis) {
+        return 0.0f; /* Preserve complete eyelid closure during blinks and deep sleep */
+    }
+
+    float norm_y = gazeOffsetY / kLidSynkinesisMaxGazeY;
+    norm_y = constrain(norm_y, -1.0f, 1.0f);
+
+    /* Upward gaze (norm_y < 0) elevates upper eyelid; downward gaze narrows aperture */
+    float delta = (norm_y < 0.0f) ? (-kLidSynkinesisUpGain * norm_y) : (-kLidSynkinesisDownGain * norm_y);
+    float synkinesis_aperture = currentAperture + delta;
+
+    return constrain(synkinesis_aperture, kMinPalpebralSynkinesis, kMaxPalpebralSynkinesis);
+}
+
+float getLidSaccadeFissureOffsetY(float gazeOffsetY) {
+    return kLidFissureTrackingGain * gazeOffsetY;
 }
 
 /* Palpebral parameters and time constants for biological sleep-struggle dynamics */

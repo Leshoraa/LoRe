@@ -43,6 +43,13 @@
 ## 3. Key Features
 
 - **60 FPS Biomechanical Kinematics**: Flash & Hogan 5th-order minimum-jerk saccade trajectory generation coupled with an underdamped second-order ocular mass-spring-damper system ($\omega_n = 32.0\text{ rad/s}, \zeta = 0.72$).
+- **Biological Free Gaze Naturalization Suite**: 6 coupled biomechanical laws eliminating mechanical servo stiffness:
+  1. *Lid-Saccade Synkinesis & Fissure Tracking*: Upper eyelid elevation on upward gaze and narrowing on downward gaze (*von Graefe's following law*).
+  2. *Post-Saccadic Elastic Glissade*: Viscoelastic extraocular muscle damping with $\approx 2.5\%$ soft landing rebound.
+  3. *Fixational Ornstein-Uhlenbeck Drift & Microsaccades*: Mean-reverting stochastic drift with $28\text{ ms}$ involuntary anti-Troxler photoreceptor reset flicks.
+  4. *Lévy Flight Gaze Exploration*: Heavy-tailed multi-tier step distribution (70% local, 20% intermediate, 10% wide leaps) modulated by on-device Curiosity drive.
+  5. *Listing's Law Axial Torsion*: Biomechanical ocular rotation around the line of sight on diagonal eccentric gaze ($\pm 2.6^\circ$).
+  6. *Hippus & Cardiorespiratory Vitality Pulse*: Continuous $\pm 2.2\%$ breathing pulsation coupled directly to Matsuoka CPG respiratory phase.
 - **Continuous Superellipse (Formula Lamé) Soma Morphology**: Real-time 60 FPS parametric ocular rendering ($|x/a|^n + |y/b|^n \le 1$), enabling LoRe to continuously actuate eye width, height, corner curvature exponent, hollow/solid stroke, asymmetric tilt, and physical OLED hardware contrast.
 - **Autonomic Brainstem CPG & Sleep-Struggle Kinetics**: Matsuoka coupled non-linear neural oscillators paired with continuous palpebral droop physics and volitional struggle snaps ("merem setengah" and fighting to stay awake), producing spontaneous biological agency.
 - **Physiological Micro-Nystagmus**: Continuous sub-pixel Langevin Brownian fluctuations coupled to ocular motor output for lifelike organic micro-tremor.
@@ -89,8 +96,10 @@
 | - Unified Rigid 2D Facial Rig (2 Expressions: IDLE, HAPPY)                      |
 | - Coordinate Hysteresis Filtering (getFilteredOx, getFilteredOy)                |
 | - Ocular Dynamics (32.0 rad/s Underdamped Mass-Spring-Damper, zeta = 0.72)      |
-| - 5th-Order Minimum-Jerk Saccades (Flash & Hogan Formulation)                   |
-| - Fixation Micro-Kinetics (Mean-Reverting Brownian Random Walk)                 |
+| - 5th-Order Minimum-Jerk Saccades with Post-Saccadic Glissade Rebound           |
+| - Fixational Dynamics (Ornstein-Uhlenbeck Drift & Anti-Troxler Microsaccades)    |
+| - Lévy Flight Gaze Exploration & Listing's Law Axial Ocular Torsion              |
+| - Lid-Saccade Synkinesis & Fissure Tracking (von Graefe's Law)                  |
 | - Non-Blocking Eyelid & Sleep-Struggle State Machine (Idle -> Droop -> Hover -> Snap -> Effort -> Doze)  |
 | - OLED Anti-Burn-In Protection (+/-1 px Micro-Shift during Standby)             |
 | - Ambient Screens (Clock, Open-Meteo Weather, Push Notification, Turn-by-Turn)   |

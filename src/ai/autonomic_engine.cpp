@@ -5,6 +5,7 @@
  */
 
 #include "src/ai/autonomic_engine.h"
+#include "src/math/kinematics.h"
 #include "src/config/lore_config.h"
 #include <math.h>
 #include <string.h>
@@ -172,11 +173,16 @@ void updateAutonomicEngine(float dt_sec) {
     s_nystagmus_y = 0.0f;
 
     /* 5. Continuous Ocular Soma State Synthesis:
-     * Anchored to canonical, stable LoRe dimensions with zero creeping enlargement */
-    float left_w = SOMA_CANONICAL_EYE_WIDTH_PX;
-    float right_w = SOMA_CANONICAL_EYE_WIDTH_PX;
-    float left_h = SOMA_CANONICAL_EYE_HEIGHT_PX;
-    float right_h = SOMA_CANONICAL_EYE_HEIGHT_PX;
+     * Anchored to canonical LoRe dimensions modulated by respiratory hippus vitality pulse */
+    static const float kHippusRespGain = 0.022f;  /* +/- 2.2% dynamic respiratory breathing pulse */
+    static const float kHippusTonicGain = 0.018f; /* Vitality scaling with metabolic energy */
+    float pulse = 1.0f + kHippusRespGain * resp_phase + kHippusTonicGain * (s_metabolic_energy - 0.50f);
+    pulse = clamp_f(pulse, 0.95f, 1.05f);
+
+    float left_w = SOMA_CANONICAL_EYE_WIDTH_PX * pulse;
+    float right_w = SOMA_CANONICAL_EYE_WIDTH_PX * pulse;
+    float left_h = SOMA_CANONICAL_EYE_HEIGHT_PX * pulse;
+    float right_h = SOMA_CANONICAL_EYE_HEIGHT_PX * pulse;
 
     /* Fixed, crisp, signature LoRe squircle exponent */
     float left_n = SOMA_CANONICAL_SQUIRCLE_N;
@@ -185,9 +191,10 @@ void updateAutonomicEngine(float dt_sec) {
     /* Stroke thickness: Always 100% solid filled */
     float stroke = SOMA_CANONICAL_STROKE_WIDTH;
 
-    /* Stable, level horizontal orientation */
-    float tilt_l = 0.0f;
-    float tilt_r = 0.0f;
+    /* Listing's Law: Biomechanical ocular torsion on diagonal eccentric gaze */
+    float torsion_rad = getListingTorsionAngleRad(g_currentOffsetX, g_currentOffsetY);
+    float tilt_l = torsion_rad;
+    float tilt_r = torsion_rad;
 
     /* Hardware OLED Contrast Brightness: dynamically linked to metabolic vitality */
     int raw_contrast = 40 + (int)(175.0f * s_metabolic_energy + 25.0f * y1);
