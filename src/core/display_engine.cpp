@@ -199,18 +199,7 @@ void oledTask(void* pvParameters) {
         uint32_t frame_start_us = micros();
         unsigned long now = millis();
 
-        /* Advance biological autonomic brainstem dynamics (CPG + metabolic homeostasis + soma synthesis) */
-        AutonomicAffectiveContext aff_ctx;
-        aff_ctx.valence = getEmotionValence();
-        aff_ctx.arousal = getEmotionArousal();
-        BrainTelemetry brain_telem = getBrainTelemetry();
-        aff_ctx.fatigue = brain_telem.drives.fatigue;
-        aff_ctx.curiosity = brain_telem.drives.curiosity;
-        aff_ctx.mischief = brain_telem.drives.mischief;
-        aff_ctx.boredom = brain_telem.drives.boredom;
-        aff_ctx.vergence_px = g_currentVergence;
-        setAutonomicAffectiveContext(&aff_ctx);
-
+        /* Advance biological autonomic brainstem dynamics (CPG + metabolic homeostasis) */
         updateAutonomicEngine(0.0166f);
         OcularSomaState current_soma = getOcularSomaState();
 

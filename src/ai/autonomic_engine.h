@@ -24,26 +24,10 @@ typedef struct {
     float nystagmus_y;          /* Physiological tremor Y [-1.0, 1.0] px */
 } AutonomicTelemetry;
 
-typedef struct {
-    float valence;       /* Affective valence [-1.0, 1.0] */
-    float arousal;       /* Affective arousal [0.0, 1.0] */
-    float fatigue;       /* Homeostatic fatigue [0.0, 1.0] */
-    float curiosity;     /* Homeostatic curiosity [0.0, 1.0] */
-    float mischief;      /* Homeostatic mischief [0.0, 1.0] */
-    float boredom;       /* Homeostatic boredom [0.0, 1.0] */
-    float vergence_px;   /* Stereoscopic depth vergence [0.0, 3.5] px */
-} AutonomicAffectiveContext;
-
 /**
  * @brief Initialize the autonomic biological dynamics engine.
  */
 void initAutonomicEngine(void);
-
-/**
- * @brief Inject real-time affective emotion and biological drives into ocular soma synthesis.
- * @param ctx Pointer to live affective context, or NULL to revert to neutral resting baseline.
- */
-void setAutonomicAffectiveContext(const AutonomicAffectiveContext* ctx);
 
 /**
  * @brief Update the Matsuoka CPG, homeostatic metabolism, and continuous soma state.

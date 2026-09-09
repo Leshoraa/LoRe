@@ -75,7 +75,7 @@ static void renderOneEyeSuperellipse(LGFX_Sprite& cv, float xc, float yc, float 
     }
 }
 
-void drawAutonomousSoma(const OcularSomaState& soma, float offsetX, float offsetY, float palpebralAperture, float vergence) {
+void drawAutonomousSoma(const OcularSomaState& soma, float offsetX, float offsetY, float palpebralAperture) {
     if (!s_canvas_ptr) return;
     LGFX_Sprite& cv = *s_canvas_ptr;
 
@@ -85,11 +85,10 @@ void drawAutonomousSoma(const OcularSomaState& soma, float offsetX, float offset
     cv.fillScreen(TFT_BLACK);
 
     float aperture = constrain(palpebralAperture, 0.0f, 1.0f);
-    int v_px = (int)roundf(vergence);
 
-    float left_xc = soma.left_x + (float)(ox + v_px) + soma.nystagmus_x;
+    float left_xc = soma.left_x + (float)ox + soma.nystagmus_x;
     float left_yc = soma.left_y + (float)oy + soma.nystagmus_y;
-    float right_xc = soma.right_x + (float)(ox - v_px) + soma.nystagmus_x;
+    float right_xc = soma.right_x + (float)ox + soma.nystagmus_x;
     float right_yc = soma.right_y + (float)oy + soma.nystagmus_y;
 
     float left_a = soma.left_w * 0.5f;
@@ -105,10 +104,86 @@ void drawAutonomousSoma(const OcularSomaState& soma, float offsetX, float offset
 
 void drawFace(Expression expr, float eyeHeightFactor, float offsetX, float offsetY, float frame, float vergence, float scale) {
     (void)frame;
-    (void)scale;
-    (void)expr;
+    if (!s_canvas_ptr) return;
+    LGFX_Sprite& cv = *s_canvas_ptr;
+
+    int ox = getFilteredOx(offsetX) + get_burn_shift_x();
+    int oy = getFilteredOy(offsetY) + get_burn_shift_y();
+
+    cv.fillScreen(TFT_BLACK);
+
+    /* Determine effective horizontal and vertical scaling factors */
+    float scaleY = g_currentEyeScaleY;
+    float scaleX = g_currentEyeScaleX;
+    if (fabsf(scale - 1.0f) > 0.001f && fabsf(scale - g_currentEyeScaleY) > 0.001f) {
+        scaleY = scale;
+        scaleX = (scaleY > 0.1f) ? (1.0f / sqrtf(scaleY)) : 1.0f;
+    }
+
+    /* Compute affective Duchenne smile softening from current positive valence */
+    float valence = getEmotionValence();
+    float d_duchenne = 0.0f;
+    if (valence > 0.20f) {
+        d_duchenne = 3.0f * constrain((valence - 0.20f) / 0.70f, 0.0f, 1.0f);
+    }
+
     float h_clamped = constrain(eyeHeightFactor, 0.0f, 1.0f);
-    drawAutonomousSoma(getOcularSomaState(), offsetX, offsetY, h_clamped, vergence);
+    float c = 1.0f - h_clamped; /* Palpebral closure progress: 0.0 = fully open, 1.0 = fully closed */
+
+    /* Calculate dynamic eye dimensions and stereoscopic vergence centers */
+    int v_px = (int)roundf(vergence);
+    int eye_w = (int)roundf(SOMA_CANONICAL_EYE_WIDTH_PX * scaleX);
+    eye_w = constrain(eye_w, 24, 40);
+
+    /* Left eye center: SOMA_CANONICAL_LEFT_X + ox + v; Right eye center: SOMA_CANONICAL_RIGHT_X + ox - v */
+    int left_x = ((int)roundf(SOMA_CANONICAL_LEFT_X) + ox + v_px) - (eye_w / 2);
+    int right_x = ((int)roundf(SOMA_CANONICAL_RIGHT_X) + ox - v_px) - (eye_w / 2);
+
+    if (h_clamped <= 0.05f) {
+        /* Render closed eyelid slits during blinks and peaceful deep sleep */
+        cv.fillRoundRect(left_x, 31 + oy, eye_w, 2, 1, TFT_WHITE);
+        cv.fillRoundRect(right_x, 31 + oy, eye_w, 2, 1, TFT_WHITE);
+    } else {
+        bool isBaselineResting = (h_clamped >= 0.99f) &&
+                                 (v_px == 0) &&
+                                 (fabsf(scaleX - 1.0f) < 0.02f) &&
+                                 (fabsf(scaleY - 1.0f) < 0.02f) &&
+                                 (d_duchenne < 0.20f);
+
+        switch (expr) {
+            case EXPR_HAPPY:
+                if (isBaselineResting) {
+                    /* Bit-exact reproduction of Lopaka monochrome bitmap when resting at baseline */
+                    cv.drawXBitmap(FACE_HAPPY_BASE_X + ox, FACE_HAPPY_BASE_Y + oy, FACE_HAPPY_BITS, FACE_HAPPY_WIDTH, FACE_HAPPY_HEIGHT, TFT_WHITE);
+                } else {
+                    int y_top = (26 + oy) + (int)roundf(5.0f * powf(c, 0.75f));
+                    int y_bottom = (37 + oy) - (int)roundf(5.0f * powf(c, 1.50f));
+                    int curH = y_bottom - y_top + 1;
+                    if (curH <= 3) {
+                        cv.fillRoundRect(left_x, 31 + oy, eye_w, 2, 1, TFT_WHITE);
+                        cv.fillRoundRect(right_x, 31 + oy, eye_w, 2, 1, TFT_WHITE);
+                    } else if (h_clamped >= 0.99f && v_px == 0) {
+                        cv.drawXBitmap(FACE_HAPPY_BASE_X + ox, FACE_HAPPY_BASE_Y + oy, FACE_HAPPY_BITS, FACE_HAPPY_WIDTH, FACE_HAPPY_HEIGHT, TFT_WHITE);
+                    } else if (h_clamped >= 0.99f) {
+                        cv.drawXBitmap(left_x, 26 + oy, FACE_HAPPY_EYE_LEFT_BITS, 32, 12, TFT_WHITE);
+                        cv.drawXBitmap(right_x, 26 + oy, FACE_HAPPY_EYE_RIGHT_BITS, 32, 12, TFT_WHITE);
+                    } else {
+                        cv.setClipRect(0, y_top, OLED_PANEL_WIDTH_PX, curH);
+                        cv.drawXBitmap(left_x, 26 + oy, FACE_HAPPY_EYE_LEFT_BITS, 32, 12, TFT_WHITE);
+                        cv.drawXBitmap(right_x, 26 + oy, FACE_HAPPY_EYE_RIGHT_BITS, 32, 12, TFT_WHITE);
+                        cv.clearClipRect();
+                    }
+                }
+                break;
+
+            case EXPR_IDLE:
+            default:
+                drawAutonomousSoma(getOcularSomaState(), offsetX, offsetY, h_clamped);
+                return;
+        }
+    }
+
+    cv.pushSprite(0, 0);
 }
 
 void drawMiniFace(Expression expr, float eyeHeightFactor, float offsetX, float offsetY, float scale) {

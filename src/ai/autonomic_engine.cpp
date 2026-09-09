@@ -47,25 +47,6 @@ static float s_nystagmus_y = 0.0f;
 /* Current Actuated Soma State */
 static OcularSomaState s_current_soma;
 
-/* Injected Affective and Homeostatic Context */
-static AutonomicAffectiveContext s_affective_ctx = {
-    .valence = 0.0f,
-    .arousal = 0.0f,
-    .fatigue = 0.0f,
-    .curiosity = 0.0f,
-    .mischief = 0.0f,
-    .boredom = 0.0f,
-    .vergence_px = 0.0f
-};
-
-void setAutonomicAffectiveContext(const AutonomicAffectiveContext* ctx) {
-    if (ctx) {
-        s_affective_ctx = *ctx;
-    } else {
-        memset(&s_affective_ctx, 0, sizeof(s_affective_ctx));
-    }
-}
-
 static inline float relu_f(float val) {
     return (val > 0.0f) ? val : 0.0f;
 }
@@ -112,7 +93,6 @@ void initAutonomicEngine(void) {
     s_current_soma.hardware_contrast = 180;
     s_current_soma.nystagmus_x = 0.0f;
     s_current_soma.nystagmus_y = 0.0f;
-    memset(&s_affective_ctx, 0, sizeof(s_affective_ctx));
 }
 
 void updateAutonomicEngine(float dt_sec) {
@@ -192,73 +172,37 @@ void updateAutonomicEngine(float dt_sec) {
     s_nystagmus_y = 0.0f;
 
     /* 5. Continuous Ocular Soma State Synthesis:
-     * Driven dynamically by affective emotion (Valence/Arousal), homeostatic biological drives,
-     * stereoscopic vergence, and autonomic vitality with zero rigid hardcoded constants. */
-    float v_pos = relu_f(s_affective_ctx.valence);
-    float v_neg = relu_f(-s_affective_ctx.valence);
-    float fatigue = clamp_f(s_affective_ctx.fatigue, 0.0f, 1.0f);
-    float curiosity = clamp_f(s_affective_ctx.curiosity, 0.0f, 1.0f);
-    float arousal = clamp_f(s_affective_ctx.arousal, 0.0f, 1.0f);
-    float boredom = clamp_f(s_affective_ctx.boredom, 0.0f, 1.0f);
-    float mischief = clamp_f(s_affective_ctx.mischief, 0.0f, 1.0f);
+     * Anchored to canonical, stable LoRe dimensions with zero creeping enlargement */
+    float left_w = SOMA_CANONICAL_EYE_WIDTH_PX;
+    float right_w = SOMA_CANONICAL_EYE_WIDTH_PX;
+    float left_h = SOMA_CANONICAL_EYE_HEIGHT_PX;
+    float right_h = SOMA_CANONICAL_EYE_HEIGHT_PX;
 
-    /* 5a. Vertical Height & Palpebral Squinting:
-     * Duchenne smile narrows eyes from below (smiling crescent),
-     * fatigue induces heavy-lidded drowsy squint,
-     * high curiosity + arousal narrows eyes into focused scrutiny,
-     * mischief triggers a subtle one-eyed sly wink/squint. */
-    float squint_amount = 0.35f * v_pos + 0.36f * fatigue + 0.16f * (curiosity * arousal);
-    float target_h_right = SOMA_CANONICAL_EYE_HEIGHT_PX * (1.0f - squint_amount);
-    float wink_asym = (mischief > 0.35f) ? (0.20f * (mischief - 0.35f)) : 0.0f;
-    float target_h_left = target_h_right * (1.0f - wink_asym);
-    target_h_left = clamp_f(target_h_left, 18.0f, 38.0f);
-    target_h_right = clamp_f(target_h_right, 18.0f, 38.0f);
+    /* Fixed, crisp, signature LoRe squircle exponent */
+    float left_n = SOMA_CANONICAL_SQUIRCLE_N;
+    float right_n = SOMA_CANONICAL_SQUIRCLE_N;
 
-    /* 5b. Horizontal Width & Volume-Conserving Tissue Dynamics:
-     * Incompressibility expansion (w ~ 1 / sqrt(h)) balances squinting,
-     * high arousal and curiosity expand width to absorb visual field. */
-    float h_ratio = SOMA_CANONICAL_EYE_HEIGHT_PX / fmaxf(10.0f, target_h_right);
-    float volume_compensation = sqrtf(h_ratio);
-    float widen_factor = 1.0f + 0.18f * arousal + 0.10f * curiosity;
-    float target_w = SOMA_CANONICAL_EYE_WIDTH_PX * widen_factor * (0.80f + 0.20f * volume_compensation);
-    target_w = clamp_f(target_w, 24.0f, 42.0f);
-
-    /* 5c. Superellipse Lamé Exponent n (Squircle Morphology):
-     * Arousal softens corners into an innocent/surprised oval (n -> 2.2),
-     * Boredom hardens corners into a flat, deadpan boxy squircle (n -> 5.6). */
-    float target_n = SOMA_CANONICAL_SQUIRCLE_N - 1.8f * arousal + 1.4f * boredom;
-    target_n = clamp_f(target_n, 2.0f, 5.8f);
-
-    /* 5d. Orbital Tilt Orientation:
-     * Strictly locked to 0.0 rad (level horizontal, upright) so the eyes
-     * never appear crooked or tilted diagonally on the OLED. */
-    float target_tilt_l = 0.0f;
-    float target_tilt_r = 0.0f;
-
-    /* 5e. Stereoscopic Depth Vergence:
-     * Medial rectus inward convergence when focusing on near targets. */
-    float v_clamped = clamp_f(s_affective_ctx.vergence_px, 0.0f, 3.5f);
-    float target_left_x = SOMA_CANONICAL_LEFT_X + v_clamped;
-    float target_right_x = SOMA_CANONICAL_RIGHT_X - v_clamped;
-
-    /* 5f. Dynamic Stroke Thickness & OLED Contrast: */
+    /* Stroke thickness: Always 100% solid filled */
     float stroke = SOMA_CANONICAL_STROKE_WIDTH;
+
+    /* Stable, level horizontal orientation */
+    float tilt_l = 0.0f;
+    float tilt_r = 0.0f;
+
+    /* Hardware OLED Contrast Brightness: dynamically linked to metabolic vitality */
     int raw_contrast = 40 + (int)(175.0f * s_metabolic_energy + 25.0f * y1);
     uint8_t hw_contrast = (uint8_t)clamp_f((float)raw_contrast, 30.0f, 255.0f);
 
-    /* 5g. Low-Pass Exponential Smoothing (60 FPS Fluidity): */
-    float alpha = 1.0f - expf(-8.0f * dt_sec);
-    s_current_soma.left_w += (target_w - s_current_soma.left_w) * alpha;
-    s_current_soma.right_w += (target_w - s_current_soma.right_w) * alpha;
-    s_current_soma.left_h += (target_h_left - s_current_soma.left_h) * alpha;
-    s_current_soma.right_h += (target_h_right - s_current_soma.right_h) * alpha;
-    s_current_soma.left_n += (target_n - s_current_soma.left_n) * alpha;
-    s_current_soma.right_n += (target_n - s_current_soma.right_n) * alpha;
-    s_current_soma.tilt_left = target_tilt_l;
-    s_current_soma.tilt_right = target_tilt_r;
-    s_current_soma.left_x += (target_left_x - s_current_soma.left_x) * alpha;
-    s_current_soma.right_x += (target_right_x - s_current_soma.right_x) * alpha;
+    /* Store updated soma state */
+    s_current_soma.left_w = left_w;
+    s_current_soma.right_w = right_w;
+    s_current_soma.left_h = left_h;
+    s_current_soma.right_h = right_h;
+    s_current_soma.left_n = left_n;
+    s_current_soma.right_n = right_n;
     s_current_soma.stroke_thickness = stroke;
+    s_current_soma.tilt_left = tilt_l;
+    s_current_soma.tilt_right = tilt_r;
     s_current_soma.hardware_contrast = hw_contrast;
     s_current_soma.nystagmus_x = s_nystagmus_x;
     s_current_soma.nystagmus_y = s_nystagmus_y;
