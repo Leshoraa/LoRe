@@ -247,3 +247,45 @@ Continuous vegetative vitality pulses through the superellipse dimensions via di
 $$S_{\text{hippus}} = 1.0 + k_{\text{resp}} \cdot y_{\text{resp}} + k_{\text{tonic}} \cdot (E_{\text{metabolic}} - 0.50)$$
 where $k_{\text{resp}} = 0.022$ ($\pm 2.2\%$ breathing expansion) and $k_{\text{tonic}} = 0.018$.
 
+---
+
+## 11. Twelve-Expression Parametric Palpebral Soma & Dual-Plane Slant Dynamics
+
+To achieve lifelike, relatable cartoon and biological facial expression dynamics matching advanced social robotics (e.g. EMO, Vector) without storing dozens of kilobytes of pre-baked bitmaps, ocular morphology is modeled as a continuous parametric superellipse modulated by dual-plane palpebral cuts.
+
+### 11.1 The 12 Affective Biological Archetypes
+The emotional state space is partitioned into 12 canonical expressions:
+1. `EXPR_IDLE`: Canonical resting squircle with balanced palpebral aperture ($n = 2.8$, $w = 32$, $h = 28$).
+2. `EXPR_HAPPY`: Crescent eyes with raised lower cheek planes ($l_{\text{lid}} = 0.45$) and Duchenne blush accents.
+3. `EXPR_ANGRY`: Inward-slanted upper brow planes ($\theta_{\text{brow}} = \pm 0.38\text{ rad} \approx \pm 22^\circ$) and tensed lower palpebra ($u_{\text{lid}} = 0.28$).
+4. `EXPR_SAD`: Dejected outer-drooping brow planes ($\theta_{\text{brow}} = \mp 0.30\text{ rad} \approx \mp 17^\circ$) and lowered gaze.
+5. `EXPR_SURPRISED`: Circularized, wide-open oculi ($n \to 2.0$, $w = 28$, $h = 32$) with zero palpebral obstruction.
+6. `EXPR_SUSPICIOUS`: Narrowed critical fissure ($h = 18$) with asymmetric skeptical brow slant ($\theta_{\text{brow,left}} = 0.18$, $\theta_{\text{brow,right}} = -0.05$).
+7. `EXPR_CURIOUS`: Asymmetric cocked brow and dilated gaze ($w_{\text{left}} = 30$, $w_{\text{right}} = 32$, $h_{\text{left}} = 30$, $h_{\text{right}} = 24$).
+8. `EXPR_MISCHIEF`: Playful smirk with slanted brow and squinted lower cheek ($u_{\text{lid}} = 0.15$, $l_{\text{lid}} = 0.25$).
+9. `EXPR_SLEEPY`: Softened, heavy upper lids ($u_{\text{lid}} = 0.42$, $l_{\text{lid}} = 0.15$) drooping over flattened oculi ($h = 18$).
+10. `EXPR_COOL`: Flat horizontal top cutoff ($u_{\text{lid}} = 0.35$, $n = 3.5$) with wide relaxed swagger ($w = 34$).
+11. `EXPR_DIZZY`: Counter-axial ocular torsion ($\theta_{\text{axial}} = \pm 0.45\text{ rad} \approx \pm 26^\circ$) with circularized oculi ($n = 2.0$).
+12. `EXPR_CRYING`: Trembling outer droop ($\theta_{\text{brow}} = \mp 0.32\text{ rad}$) with palpebral constriction and animated weeping tear drops.
+
+### 11.2 Dual-Plane Palpebral Slant Formulation
+Whole-eye coordinate rotation tilts both top and bottom edges simultaneously. To allow independent brow slants while maintaining horizontal or squinting cheek planes, two linear cutting planes are evaluated in rotated ocular space $(x_r, y_r)$:
+$$\text{Upper Brow Boundary: } y_r < -y_{\text{top\_cut}} + x_r \cdot \tan(\theta_{\text{brow}})$$
+$$\text{Lower Cheek Boundary: } y_r > y_{\text{bottom\_cut}} + x_r \cdot \tan(\theta_{\text{cheek}})$$
+where:
+$$y_{\text{top\_cut}} = b \cdot (1.0 - u_{\text{lid}}), \quad y_{\text{bottom\_cut}} = b \cdot (1.0 - l_{\text{lid}})$$
+
+**Early-Exit Optimization:** Because linear inequality checks are evaluated prior to calculating the Lamé equation $(|x_r|/a)^n + (|y_r|/b)^n \le 1$, clipped pixels outside the palpebral fissure exit immediately, reducing power function calls and accelerating rasterization during squinted and slanted expressions.
+
+### 11.3 Critically Damped 60 FPS Morphing Interpolation
+Continuous morph target parameters $\mathbf{m}_t = [w, h, n, \theta_{\text{axial}}, \theta_{\text{brow}}, \theta_{\text{cheek}}, u_{\text{lid}}, l_{\text{lid}}]^T$ converge towards the target configuration $\mathbf{m}^*_{\text{expr}}$ with an 85 ms critically damped response time ($\tau = 0.085\text{ s}$):
+$$\alpha = 1.0 - e^{-\Delta t / \tau}$$
+$$\mathbf{m}_{t+\Delta t} = \mathbf{m}_t + \alpha \cdot (\mathbf{m}^*_{\text{expr}} - \mathbf{m}_t)$$
+
+### 11.4 12-Class TinyML Decision Matrix & Boltzmann Softmax Policy
+The on-device feedforward neural network maps the 8D affective and biological state vector $\mathbf{s} = [V, A, \text{Cur}, \text{Soc}, \text{Bor}, \text{Fat}, \text{Mis}, \text{Prox}]^T$ to 12 expression logits:
+$$z_i = b_i + \sum_{j=1}^8 W_{ij} s_j + \delta_i^{\text{bonding}} + \delta_i^{\text{memory}}$$
+Logits are converted to a stochastic decision distribution via Boltzmann softmax:
+$$P(E_i) = \frac{e^{(z_i - z_{\max}) / \tau_{\text{boltz}}}}{\sum_{k=1}^{12} e^{(z_k - z_{\max}) / \tau_{\text{boltz}}}} \quad (\tau_{\text{boltz}} = 0.85)$$
+Expression policy selection samples from this categorical distribution, ensuring dynamic, autonomous behavioral diversity without repetitive deterministic loops.
+

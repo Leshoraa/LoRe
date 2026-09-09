@@ -31,10 +31,20 @@ extern "C" {
  */
 typedef enum {
     EXPR_IDLE = 0,
-    EXPR_HAPPY = 1
+    EXPR_HAPPY = 1,
+    EXPR_ANGRY = 2,
+    EXPR_SAD = 3,
+    EXPR_SURPRISED = 4,
+    EXPR_SUSPICIOUS = 5,
+    EXPR_CURIOUS = 6,
+    EXPR_MISCHIEF = 7,
+    EXPR_SLEEPY = 8,
+    EXPR_COOL = 9,
+    EXPR_DIZZY = 10,
+    EXPR_CRYING = 11
 } Expression;
 
-#define NUM_EXPRESSIONS 2
+#define NUM_EXPRESSIONS 12
 
 /**
  * @struct OcularSomaState
@@ -48,6 +58,10 @@ typedef struct {
     float left_n, right_n;        /* Superellipse Lamé exponent (2.0 = ellipse, 4.0..5.0 = squircle, <2.0 = astroid) */
     float stroke_thickness;       /* 0.0f = solid filled, 1.0f..4.0f = hollow outline border width */
     float tilt_left, tilt_right;  /* Eye tilt slant angle in radians */
+    float brow_tilt_left, brow_tilt_right;   /* Upper eyelid / eyebrow slant angle in radians */
+    float cheek_tilt_left, cheek_tilt_right; /* Lower eyelid / cheek slant angle in radians */
+    float upper_lid_left, upper_lid_right;   /* Upper eyelid droop progress [0.0 = open, 1.0 = closed] */
+    float lower_lid_left, lower_lid_right;   /* Lower eyelid push-up [0.0 = baseline, 1.0 = high cheek smile] */
     float palpebral_aperture;     /* Upper/lower eyelid opening factor [0.0 = fully closed slit, 1.0 = fully open] */
     uint8_t hardware_contrast;    /* SSD1306 physical OLED contrast brightness [0..255] */
     float nystagmus_x, nystagmus_y; /* Sub-pixel physiological micro-tremor */

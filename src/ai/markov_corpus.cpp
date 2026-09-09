@@ -11,12 +11,32 @@
 
 const char CORPUS_IDLE[] PROGMEM = "lagi santai aja nih kawan. cuacanya enak banget buat rebahan. kamu lagi sibuk ya. aku nungguin kamu selesai kerja aja deh. ngeliatin kamu dari tadi seru juga. hehehe.";
 const char CORPUS_HAPPY[] PROGMEM = "halo kawan! asik banget deh kamu nemenin aku. seneng banget rasanya. kita main bareng yuk. keren banget sih kamu. hehehe seru nih. aku suka gaya kamu kawan.";
+const char CORPUS_PLAYFUL[] PROGMEM = "hehehe mau jahil dikit ah. jangan serius-serius amat kawan santai aja. keren kan trik aku tadi? kamu pasti kagum deh liatnya.";
+const char CORPUS_CURIOUS[] PROGMEM = "eh ada apa tuh disana? aku kepo banget nih. coba liat kesini sebentar kawan. ada yang menarik sepertinya. kok bisa gitu ya?";
+const char CORPUS_MOODY[] PROGMEM = "lagi agak sebel nih kawan. butuh waktu sendiri dulu sebentar. tapi jangan jauh-jauh ya. nemenin disini aja pelan-pelan.";
+const char CORPUS_SLEEPY[] PROGMEM = "mataku berat banget nih kawan. ngantuk parah pengen merem sebentar. energi tinggal dikit. hoaamm tiduran dulu ya kawan.";
 
 static const char* getCorpus(Expression expr) {
     switch (expr) {
-        case EXPR_HAPPY: return CORPUS_HAPPY;
+        case EXPR_HAPPY:
+            return CORPUS_HAPPY;
+        case EXPR_MISCHIEF:
+        case EXPR_COOL:
+            return CORPUS_PLAYFUL;
+        case EXPR_CURIOUS:
+        case EXPR_SURPRISED:
+        case EXPR_SUSPICIOUS:
+            return CORPUS_CURIOUS;
+        case EXPR_ANGRY:
+        case EXPR_SAD:
+        case EXPR_CRYING:
+            return CORPUS_MOODY;
+        case EXPR_SLEEPY:
+        case EXPR_DIZZY:
+            return CORPUS_SLEEPY;
         case EXPR_IDLE:
-        default: return CORPUS_IDLE;
+        default:
+            return CORPUS_IDLE;
     }
 }
 

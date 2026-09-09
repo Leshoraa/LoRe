@@ -235,7 +235,7 @@ static void processIncomingBleData(const String& raw_input) {
                     LORE_LOG_INF("BLE", "Expression reset to autonomous Auto Mood via BLE");
                 } else {
                     int code = atoi(expr_str);
-                    if (code >= 0 && code <= 7) {
+                    if (code >= 0 && code < NUM_EXPRESSIONS) {
                         setManualExpression(code);
                         LORE_LOG_INF("BLE", "Expression set to %d (%s) via BLE", code, getExpressionName((Expression)code));
                     }
@@ -553,7 +553,7 @@ static void processIncomingBleData(const String& raw_input) {
             LORE_LOG_INF("BLE", "Expression reset to autonomous Auto Mood via text command");
         } else {
             int code = val.toInt();
-            if (code >= 0 && code <= 7) {
+            if (code >= 0 && code < NUM_EXPRESSIONS) {
                 setManualExpression(code);
                 LORE_LOG_INF("BLE", "Expression set to %d (%s) via BLE text command", code, getExpressionName((Expression)code));
             }

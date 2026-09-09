@@ -48,17 +48,47 @@ static float s_decision_probs[NUM_EXPRESSIONS] = {0};
 static Expression s_dominant_expr = EXPR_IDLE;
 static char s_thought_summary[48] = "Booting cognitive engine...";
 
-/* 2x8 Neural Weight Matrix: Maps [V, A, Cur, Soc, Bor, Fat, Mis, Prox] -> 2 Expressions */
+/* 12x8 Neural Weight Matrix: Maps [V, A, Cur, Soc, Bor, Fat, Mis, Prox] -> 12 Expressions */
 static const float s_neural_weights[NUM_EXPRESSIONS][8] = {
-    /* IDLE: Dominant calm resting baseline */
+    /* 0: IDLE - Dominant calm resting baseline */
     {  0.1f, -0.4f,  0.1f,  0.2f,  0.3f, -0.2f, -0.2f,  0.1f },
-    /* HAPPY: High Valence, High Social, High Proximity, High Bonding */
-    {  1.8f,  0.5f,  0.3f,  1.4f, -0.8f, -0.4f,  0.4f,  0.6f }
+    /* 1: HAPPY - High Valence, High Social, High Proximity, High Bonding */
+    {  1.8f,  0.5f,  0.3f,  1.4f, -0.8f, -0.4f,  0.4f,  0.6f },
+    /* 2: ANGRY - Negative Valence, High Arousal, High Mischief, Low Social */
+    { -1.8f,  1.5f, -0.2f, -1.0f,  0.2f,  0.1f,  1.2f, -0.3f },
+    /* 3: SAD - Negative Valence, Low Arousal, Low Social, High Solitude */
+    { -1.9f, -1.2f, -0.5f, -1.5f,  1.0f,  0.6f, -0.8f, -0.6f },
+    /* 4: SURPRISED - High Arousal, High Curiosity, High Proximity Pulse */
+    {  0.2f,  1.8f,  1.4f,  0.3f, -1.0f, -0.8f,  0.2f,  1.2f },
+    /* 5: SUSPICIOUS - Negative Valence, Moderate Arousal, High Curiosity, Low Social */
+    { -0.6f,  0.6f,  1.2f, -0.8f,  0.3f, -0.2f,  0.8f,  0.4f },
+    /* 6: CURIOUS - Moderate Valence, Moderate Arousal, Very High Curiosity & Proximity */
+    {  0.6f,  0.8f,  1.9f,  0.5f, -0.5f, -0.5f,  0.5f,  0.9f },
+    /* 7: MISCHIEF - High Mischief Drive, High Arousal, Positive Valence */
+    {  0.8f,  1.1f,  0.7f,  0.6f, -0.3f, -0.6f,  1.8f,  0.5f },
+    /* 8: SLEEPY - High Fatigue, Low Arousal, Low Curiosity */
+    { -0.2f, -1.8f, -0.9f, -0.4f,  0.5f,  2.0f, -0.7f, -0.5f },
+    /* 9: COOL - Positive Valence, Moderate Social, Low Arousal, High Confidence */
+    {  1.2f, -0.2f,  0.2f,  0.8f, -0.4f, -0.3f,  0.7f,  0.3f },
+    /* 10: DIZZY - Very High Arousal, Elevated Fatigue, Rapid Disturbance */
+    { -0.5f,  1.7f, -0.4f, -0.2f, -0.6f,  1.4f,  0.3f,  0.8f },
+    /* 11: CRYING - Extreme Negative Valence, Low Social, High Distress */
+    { -2.2f,  0.8f, -0.6f, -1.6f,  0.8f,  0.9f, -1.0f, -0.7f }
 };
 
 static const float s_neural_biases[NUM_EXPRESSIONS] = {
-    1.20f,  /* IDLE bias */
-   -0.50f   /* HAPPY bias */
+     1.20f,  /* 0: IDLE */
+    -0.40f,  /* 1: HAPPY */
+    -1.50f,  /* 2: ANGRY */
+    -1.40f,  /* 3: SAD */
+    -1.20f,  /* 4: SURPRISED */
+    -1.30f,  /* 5: SUSPICIOUS */
+    -0.80f,  /* 6: CURIOUS */
+    -1.00f,  /* 7: MISCHIEF */
+    -0.60f,  /* 8: SLEEPY */
+    -1.10f,  /* 9: COOL */
+    -1.60f,  /* 10: DIZZY */
+    -1.80f   /* 11: CRYING */
 };
 
 void loadBrainMemoryNVS(void) {
@@ -254,6 +284,8 @@ void updateBrainEngine(float dt_sec) {
 
         if (i == EXPR_HAPPY) {
             sum += 0.8f * s_bonding_level;
+        } else if (i == EXPR_COOL) {
+            sum += 0.3f * s_bonding_level;
         }
 
         sum += recall.memory_logits_delta[i];

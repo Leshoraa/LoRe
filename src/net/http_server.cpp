@@ -157,7 +157,7 @@ static esp_err_t set_expression_handler(httpd_req_t *req) {
             setManualExpression(-1);
         } else {
             int code = atoi(expr_val);
-            if (code >= 0 && code <= 7) {
+            if (code >= 0 && code < NUM_EXPRESSIONS) {
                 setManualExpression(code);
             }
         }

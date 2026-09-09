@@ -6,6 +6,7 @@
 
 #include "src/ai/autonomic_engine.h"
 #include "src/math/kinematics.h"
+#include "src/math/affective_engine.h"
 #include "src/config/lore_config.h"
 #include <math.h>
 #include <string.h>
@@ -48,6 +49,80 @@ static float s_nystagmus_y = 0.0f;
 /* Current Actuated Soma State */
 static OcularSomaState s_current_soma;
 
+/* Parametric Morph Target Table for LoRe's 12 Biological & Expressive States */
+struct ExpressionMorphTarget {
+    float w_left;
+    float w_right;
+    float h_left;
+    float h_right;
+    float n_left;
+    float n_right;
+    float tilt_left;
+    float tilt_right;
+    float brow_left;
+    float brow_right;
+    float cheek_left;
+    float cheek_right;
+    float upper_lid_left;
+    float upper_lid_right;
+    float lower_lid_left;
+    float lower_lid_right;
+};
+
+/* Morph Target Definition Table:
+ * Fields: { w_l, w_r, h_l, h_r, n_l, n_r, tilt_l, tilt_r, brow_l, brow_r, cheek_l, cheek_r, ulid_l, ulid_r, llid_l, llid_r }
+ *
+ * Anatomical conventions:
+ * - Positive brow_left (+rad) and negative brow_right (-rad) slant DOWNWARDS toward facial midline (angry/determined brow).
+ * - Negative brow_left (-rad) and positive brow_right (+rad) droop DOWNWARDS toward outer lateral corners (sad/sorrow brow).
+ * - lower_lid: cheek squint pushing upwards (e.g. happy crescent, smiling squint).
+ * - upper_lid: palpebral droop falling downwards (e.g. sleepy, cool, suspicious).
+ */
+static const ExpressionMorphTarget kExpressionMorphTable[NUM_EXPRESSIONS] = {
+    /* 0: EXPR_IDLE - Balanced canonical resting squircle */
+    { 32.0f, 32.0f, 28.0f, 28.0f, 2.8f, 2.8f,  0.00f,  0.00f,  0.00f,  0.00f, 0.0f, 0.0f, 0.00f, 0.00f, 0.00f, 0.00f },
+    /* 1: EXPR_HAPPY - Cheerful crescent with raised lower palpebral cheek planes */
+    { 32.0f, 32.0f, 26.0f, 26.0f, 2.8f, 2.8f,  0.00f,  0.00f,  0.00f,  0.00f, 0.0f, 0.0f, 0.00f, 0.00f, 0.45f, 0.45f },
+    /* 2: EXPR_ANGRY - Fierce inward-slanted brow plane with tensed lower palpebra */
+    { 32.0f, 32.0f, 26.0f, 26.0f, 2.6f, 2.6f,  0.00f,  0.00f,  0.38f, -0.38f, 0.0f, 0.0f, 0.28f, 0.28f, 0.10f, 0.10f },
+    /* 3: EXPR_SAD - Dejected outer-drooping brow plane with lowered gaze */
+    { 30.0f, 30.0f, 25.0f, 25.0f, 3.0f, 3.0f,  0.00f,  0.00f, -0.30f,  0.30f, 0.0f, 0.0f, 0.25f, 0.25f, 0.05f, 0.05f },
+    /* 4: EXPR_SURPRISED - Wide-open, dilated round oculi (n -> 2.0) with zero palpebral obstruction */
+    { 28.0f, 28.0f, 32.0f, 32.0f, 2.0f, 2.0f,  0.00f,  0.00f,  0.00f,  0.00f, 0.0f, 0.0f, 0.00f, 0.00f, 0.00f, 0.00f },
+    /* 5: EXPR_SUSPICIOUS - Narrowed critical aperture with asymmetric skeptical brow slant */
+    { 34.0f, 34.0f, 18.0f, 18.0f, 3.2f, 3.2f,  0.00f,  0.00f,  0.18f, -0.05f, 0.0f, 0.0f, 0.22f, 0.25f, 0.20f, 0.20f },
+    /* 6: EXPR_CURIOUS - Asymmetric raised inquisitive brow and dilated left gaze */
+    { 30.0f, 32.0f, 30.0f, 24.0f, 2.4f, 2.8f, -0.05f,  0.05f, -0.15f,  0.10f, 0.0f, 0.0f, 0.00f, 0.15f, 0.00f, 0.05f },
+    /* 7: EXPR_MISCHIEF - Playful asymmetric smirk with slanted brow and squinted lower lid */
+    { 32.0f, 32.0f, 24.0f, 24.0f, 2.8f, 2.8f,  0.08f, -0.08f,  0.28f, -0.15f, 0.0f, 0.0f, 0.15f, 0.15f, 0.25f, 0.25f },
+    /* 8: EXPR_SLEEPY - Heavy drowsy upper lids drooping over softened oculi */
+    { 32.0f, 32.0f, 18.0f, 18.0f, 3.0f, 3.0f,  0.00f,  0.00f,  0.00f,  0.00f, 0.0f, 0.0f, 0.42f, 0.42f, 0.15f, 0.15f },
+    /* 9: EXPR_COOL - Sunglasses swagger with horizontal top cutoff and relaxed posture */
+    { 34.0f, 34.0f, 22.0f, 22.0f, 3.5f, 3.5f,  0.00f,  0.00f,  0.00f,  0.00f, 0.0f, 0.0f, 0.35f, 0.35f, 0.00f, 0.00f },
+    /* 10: EXPR_DIZZY - Disoriented counter-axial torsion with circularized oculi */
+    { 26.0f, 26.0f, 26.0f, 26.0f, 2.0f, 2.0f,  0.45f, -0.45f,  0.00f,  0.00f, 0.0f, 0.0f, 0.10f, 0.10f, 0.10f, 0.10f },
+    /* 11: EXPR_CRYING - Trembling sorrowful outer droop with weeping palpebral constriction */
+    { 30.0f, 30.0f, 24.0f, 24.0f, 2.8f, 2.8f,  0.00f,  0.00f, -0.32f,  0.32f, 0.0f, 0.0f, 0.30f, 0.30f, 0.20f, 0.20f }
+};
+
+/* Dynamically filtered continuous morph targets */
+static float s_morph_w_l = SOMA_CANONICAL_EYE_WIDTH_PX;
+static float s_morph_w_r = SOMA_CANONICAL_EYE_WIDTH_PX;
+static float s_morph_h_l = SOMA_CANONICAL_EYE_HEIGHT_PX;
+static float s_morph_h_r = SOMA_CANONICAL_EYE_HEIGHT_PX;
+static float s_morph_n_l = SOMA_CANONICAL_SQUIRCLE_N;
+static float s_morph_n_r = SOMA_CANONICAL_SQUIRCLE_N;
+static float s_morph_tilt_l = 0.0f;
+static float s_morph_tilt_r = 0.0f;
+static float s_morph_brow_l = 0.0f;
+static float s_morph_brow_r = 0.0f;
+static float s_morph_cheek_l = 0.0f;
+static float s_morph_cheek_r = 0.0f;
+static float s_morph_upper_lid_l = 0.0f;
+static float s_morph_upper_lid_r = 0.0f;
+static float s_morph_lower_lid_l = 0.0f;
+static float s_morph_lower_lid_r = 0.0f;
+
 static inline float relu_f(float val) {
     return (val > 0.0f) ? val : 0.0f;
 }
@@ -76,6 +151,23 @@ void initAutonomicEngine(void) {
     s_nystagmus_x = 0.0f;
     s_nystagmus_y = 0.0f;
 
+    s_morph_w_l = SOMA_CANONICAL_EYE_WIDTH_PX;
+    s_morph_w_r = SOMA_CANONICAL_EYE_WIDTH_PX;
+    s_morph_h_l = SOMA_CANONICAL_EYE_HEIGHT_PX;
+    s_morph_h_r = SOMA_CANONICAL_EYE_HEIGHT_PX;
+    s_morph_n_l = SOMA_CANONICAL_SQUIRCLE_N;
+    s_morph_n_r = SOMA_CANONICAL_SQUIRCLE_N;
+    s_morph_tilt_l = 0.0f;
+    s_morph_tilt_r = 0.0f;
+    s_morph_brow_l = 0.0f;
+    s_morph_brow_r = 0.0f;
+    s_morph_cheek_l = 0.0f;
+    s_morph_cheek_r = 0.0f;
+    s_morph_upper_lid_l = 0.0f;
+    s_morph_upper_lid_r = 0.0f;
+    s_morph_lower_lid_l = 0.0f;
+    s_morph_lower_lid_r = 0.0f;
+
     /* Initialize baseline soma state */
     s_current_soma.left_x = SOMA_CANONICAL_LEFT_X;
     s_current_soma.left_y = SOMA_CANONICAL_CENTER_Y;
@@ -90,6 +182,14 @@ void initAutonomicEngine(void) {
     s_current_soma.stroke_thickness = SOMA_CANONICAL_STROKE_WIDTH; /* Solid filled */
     s_current_soma.tilt_left = 0.0f;
     s_current_soma.tilt_right = 0.0f;
+    s_current_soma.brow_tilt_left = 0.0f;
+    s_current_soma.brow_tilt_right = 0.0f;
+    s_current_soma.cheek_tilt_left = 0.0f;
+    s_current_soma.cheek_tilt_right = 0.0f;
+    s_current_soma.upper_lid_left = 0.0f;
+    s_current_soma.upper_lid_right = 0.0f;
+    s_current_soma.lower_lid_left = 0.0f;
+    s_current_soma.lower_lid_right = 0.0f;
     s_current_soma.palpebral_aperture = 1.0f;
     s_current_soma.hardware_contrast = 180;
     s_current_soma.nystagmus_x = 0.0f;
@@ -173,28 +273,52 @@ void updateAutonomicEngine(float dt_sec) {
     s_nystagmus_y = 0.0f;
 
     /* 5. Continuous Ocular Soma State Synthesis:
-     * Anchored to canonical LoRe dimensions modulated by respiratory hippus vitality pulse */
+     * Morph targets converge smoothly towards active expression with 85 ms critically damped response */
+    static const float kMorphTauSec = 0.085f;
+    float alpha = 1.0f - expf(-dt_sec / kMorphTauSec);
+    alpha = clamp_f(alpha, 0.0f, 1.0f);
+
+    int expr_idx = (int)g_currentExpr;
+    if (expr_idx < 0 || expr_idx >= NUM_EXPRESSIONS) expr_idx = (int)EXPR_IDLE;
+    const ExpressionMorphTarget& tgt = kExpressionMorphTable[expr_idx];
+
+    s_morph_w_l += (tgt.w_left - s_morph_w_l) * alpha;
+    s_morph_w_r += (tgt.w_right - s_morph_w_r) * alpha;
+    s_morph_h_l += (tgt.h_left - s_morph_h_l) * alpha;
+    s_morph_h_r += (tgt.h_right - s_morph_h_r) * alpha;
+    s_morph_n_l += (tgt.n_left - s_morph_n_l) * alpha;
+    s_morph_n_r += (tgt.n_right - s_morph_n_r) * alpha;
+    s_morph_tilt_l += (tgt.tilt_left - s_morph_tilt_l) * alpha;
+    s_morph_tilt_r += (tgt.tilt_right - s_morph_tilt_r) * alpha;
+    s_morph_brow_l += (tgt.brow_left - s_morph_brow_l) * alpha;
+    s_morph_brow_r += (tgt.brow_right - s_morph_brow_r) * alpha;
+    s_morph_cheek_l += (tgt.cheek_left - s_morph_cheek_l) * alpha;
+    s_morph_cheek_r += (tgt.cheek_right - s_morph_cheek_r) * alpha;
+    s_morph_upper_lid_l += (tgt.upper_lid_left - s_morph_upper_lid_l) * alpha;
+    s_morph_upper_lid_r += (tgt.upper_lid_right - s_morph_upper_lid_r) * alpha;
+    s_morph_lower_lid_l += (tgt.lower_lid_left - s_morph_lower_lid_l) * alpha;
+    s_morph_lower_lid_r += (tgt.lower_lid_right - s_morph_lower_lid_r) * alpha;
+
+    /* Modulated by respiratory hippus vitality pulse */
     static const float kHippusRespGain = 0.022f;  /* +/- 2.2% dynamic respiratory breathing pulse */
     static const float kHippusTonicGain = 0.018f; /* Vitality scaling with metabolic energy */
     float pulse = 1.0f + kHippusRespGain * resp_phase + kHippusTonicGain * (s_metabolic_energy - 0.50f);
     pulse = clamp_f(pulse, 0.95f, 1.05f);
 
-    float left_w = SOMA_CANONICAL_EYE_WIDTH_PX * pulse;
-    float right_w = SOMA_CANONICAL_EYE_WIDTH_PX * pulse;
-    float left_h = SOMA_CANONICAL_EYE_HEIGHT_PX * pulse;
-    float right_h = SOMA_CANONICAL_EYE_HEIGHT_PX * pulse;
-
-    /* Fixed, crisp, signature LoRe squircle exponent */
-    float left_n = SOMA_CANONICAL_SQUIRCLE_N;
-    float right_n = SOMA_CANONICAL_SQUIRCLE_N;
+    float left_w = s_morph_w_l * pulse;
+    float right_w = s_morph_w_r * pulse;
+    float left_h = s_morph_h_l * pulse;
+    float right_h = s_morph_h_r * pulse;
+    float left_n = s_morph_n_l;
+    float right_n = s_morph_n_r;
 
     /* Stroke thickness: Always 100% solid filled */
     float stroke = SOMA_CANONICAL_STROKE_WIDTH;
 
     /* Listing's Law: Biomechanical ocular torsion on diagonal eccentric gaze */
     float torsion_rad = getListingTorsionAngleRad(g_currentOffsetX, g_currentOffsetY);
-    float tilt_l = torsion_rad;
-    float tilt_r = torsion_rad;
+    float tilt_l = s_morph_tilt_l + torsion_rad;
+    float tilt_r = s_morph_tilt_r + torsion_rad;
 
     /* Hardware OLED Contrast Brightness: dynamically linked to metabolic vitality */
     int raw_contrast = 40 + (int)(175.0f * s_metabolic_energy + 25.0f * y1);
@@ -210,6 +334,14 @@ void updateAutonomicEngine(float dt_sec) {
     s_current_soma.stroke_thickness = stroke;
     s_current_soma.tilt_left = tilt_l;
     s_current_soma.tilt_right = tilt_r;
+    s_current_soma.brow_tilt_left = s_morph_brow_l;
+    s_current_soma.brow_tilt_right = s_morph_brow_r;
+    s_current_soma.cheek_tilt_left = s_morph_cheek_l;
+    s_current_soma.cheek_tilt_right = s_morph_cheek_r;
+    s_current_soma.upper_lid_left = s_morph_upper_lid_l;
+    s_current_soma.upper_lid_right = s_morph_upper_lid_r;
+    s_current_soma.lower_lid_left = s_morph_lower_lid_l;
+    s_current_soma.lower_lid_right = s_morph_lower_lid_r;
     s_current_soma.hardware_contrast = hw_contrast;
     s_current_soma.nystagmus_x = s_nystagmus_x;
     s_current_soma.nystagmus_y = s_nystagmus_y;

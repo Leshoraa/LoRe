@@ -35,12 +35,32 @@ static uint8_t s_memory_head = 0;
 static float s_latest_resonance = 0.0f;
 static Expression s_latest_recalled_expr = EXPR_IDLE;
 
-/* Associative Expression Reinforcement Matrix [Past Expr 0..1][Logit Target 0..1] */
+/* Associative Expression Reinforcement Matrix [Past Expr 0..11][Logit Target 0..11] */
 static const float s_associative_matrix[NUM_EXPRESSIONS][NUM_EXPRESSIONS] = {
-    /* 0: IDLE recalled  -> IDLE,  HAPPY */
-    {                        0.4f, -0.2f },
-    /* 1: HAPPY recalled -> IDLE,  HAPPY */
-    {                       -0.3f,  1.2f }
+    /* 0: IDLE recalled */
+    {  0.8f, -0.2f, -0.4f, -0.1f, -0.4f, -0.2f, -0.1f, -0.2f,  0.3f,  0.2f, -0.4f, -0.4f },
+    /* 1: HAPPY recalled */
+    { -0.2f,  1.3f, -0.7f, -0.8f,  0.1f, -0.4f,  0.2f,  0.3f, -0.4f,  0.4f, -0.2f, -1.0f },
+    /* 2: ANGRY recalled */
+    { -0.3f, -0.8f,  1.3f, -0.2f,  0.2f,  0.4f, -0.2f,  0.3f, -0.5f, -0.2f,  0.2f, -0.1f },
+    /* 3: SAD recalled */
+    { -0.1f, -0.9f, -0.2f,  1.2f, -0.3f,  0.1f, -0.4f, -0.5f,  0.3f, -0.4f, -0.2f,  0.7f },
+    /* 4: SURPRISED recalled */
+    { -0.3f,  0.2f,  0.2f, -0.3f,  1.3f,  0.3f,  0.5f,  0.2f, -0.8f, -0.2f,  0.4f, -0.2f },
+    /* 5: SUSPICIOUS recalled */
+    { -0.2f, -0.4f,  0.3f,  0.1f,  0.3f,  1.2f,  0.4f,  0.2f, -0.4f,  0.1f, -0.2f, -0.2f },
+    /* 6: CURIOUS recalled */
+    { -0.1f,  0.3f, -0.2f, -0.3f,  0.4f,  0.3f,  1.3f,  0.3f, -0.5f,  0.2f, -0.1f, -0.3f },
+    /* 7: MISCHIEF recalled */
+    { -0.2f,  0.4f,  0.2f, -0.6f,  0.2f,  0.2f,  0.3f,  1.3f, -0.5f,  0.3f,  0.2f, -0.7f },
+    /* 8: SLEEPY recalled */
+    {  0.4f, -0.3f, -0.5f,  0.2f, -0.8f, -0.4f, -0.5f, -0.5f,  1.3f, -0.2f, -0.5f,  0.1f },
+    /* 9: COOL recalled */
+    {  0.2f,  0.3f, -0.3f, -0.5f, -0.2f,  0.1f,  0.2f,  0.3f, -0.3f,  1.2f, -0.4f, -0.8f },
+    /* 10: DIZZY recalled */
+    { -0.4f, -0.1f,  0.2f, -0.2f,  0.4f, -0.2f,  0.1f,  0.2f, -0.4f, -0.3f,  1.3f,  0.1f },
+    /* 11: CRYING recalled */
+    { -0.4f, -1.1f, -0.1f,  0.7f, -0.2f, -0.2f, -0.4f, -0.7f,  0.1f, -0.7f,  0.1f,  1.4f }
 };
 
 static float computeCosineSimilarity(const float a[EPISODIC_EMBEDDING_DIM], const float b[EPISODIC_EMBEDDING_DIM]) {
@@ -178,7 +198,37 @@ EpisodicRecallResult queryMemoryResonance(const float state_vector[EPISODIC_EMBE
     if (result.resonance_score > 0.65f && result.top_k_count > 0) {
         switch (best_expr) {
             case EXPR_HAPPY:
-                snprintf(result.recall_context, sizeof(result.recall_context), "Remembering happy moments! (Happy resonance)");
+                snprintf(result.recall_context, sizeof(result.recall_context), "Remembering happy moments! (Joy resonance)");
+                break;
+            case EXPR_ANGRY:
+                snprintf(result.recall_context, sizeof(result.recall_context), "Remembering feeling upset (Frustration resonance)");
+                break;
+            case EXPR_SAD:
+                snprintf(result.recall_context, sizeof(result.recall_context), "Remembering lonely quiet times (Sad resonance)");
+                break;
+            case EXPR_SURPRISED:
+                snprintf(result.recall_context, sizeof(result.recall_context), "Remembering sudden surprise! (Shock resonance)");
+                break;
+            case EXPR_SUSPICIOUS:
+                snprintf(result.recall_context, sizeof(result.recall_context), "Remembering being cautious (Suspicion resonance)");
+                break;
+            case EXPR_CURIOUS:
+                snprintf(result.recall_context, sizeof(result.recall_context), "Remembering intriguing mysteries (Curiosity resonance)");
+                break;
+            case EXPR_MISCHIEF:
+                snprintf(result.recall_context, sizeof(result.recall_context), "Remembering funny playful pranks! (Mischief resonance)");
+                break;
+            case EXPR_SLEEPY:
+                snprintf(result.recall_context, sizeof(result.recall_context), "Remembering cozy nap times (Sleepy resonance)");
+                break;
+            case EXPR_COOL:
+                snprintf(result.recall_context, sizeof(result.recall_context), "Remembering effortless confidence (Cool resonance)");
+                break;
+            case EXPR_DIZZY:
+                snprintf(result.recall_context, sizeof(result.recall_context), "Remembering wild spinning fun (Dizzy resonance)");
+                break;
+            case EXPR_CRYING:
+                snprintf(result.recall_context, sizeof(result.recall_context), "Remembering times of sorrow (Tearful resonance)");
                 break;
             case EXPR_IDLE:
             default:

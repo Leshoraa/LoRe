@@ -51,16 +51,17 @@
   5. *Listing's Law Axial Torsion*: Biomechanical ocular rotation around the line of sight on diagonal eccentric gaze ($\pm 2.6^\circ$).
   6. *Hippus & Cardiorespiratory Vitality Pulse*: Continuous $\pm 2.2\%$ breathing pulsation coupled directly to Matsuoka CPG respiratory phase.
 - **Continuous Superellipse (Formula Lamé) Soma Morphology**: Real-time 60 FPS parametric ocular rendering ($|x/a|^n + |y/b|^n \le 1$), enabling LoRe to continuously actuate eye width, height, corner curvature exponent, hollow/solid stroke, asymmetric tilt, and physical OLED hardware contrast.
+- **Twelve-Expression Parametric Palpebral Soma & Dual-Plane Slants**: Complete suite of 12 rich biological and expressive archetypes (`IDLE`, `HAPPY`, `ANGRY`, `SAD`, `SURPRISED`, `SUSPICIOUS`, `CURIOUS`, `MISCHIEF`, `SLEEPY`, `COOL`, `DIZZY`, `CRYING`) animated at 60 FPS via independent upper brow and lower cheek cutting planes ($y_r < -y_{\text{top\_cut}} + x_r \tan\theta_{\text{brow}}$ and $y_r > y_{\text{bottom\_cut}} + x_r \tan\theta_{\text{cheek}}$) with early-exit rasterization and 85 ms critically damped morph target convergence.
 - **Autonomic Brainstem CPG & Sleep-Struggle Kinetics**: Matsuoka coupled non-linear neural oscillators paired with continuous palpebral droop physics and volitional struggle snaps ("merem setengah" and fighting to stay awake), producing spontaneous biological agency.
 - **Physiological Micro-Nystagmus**: Continuous sub-pixel Langevin Brownian fluctuations coupled to ocular motor output for lifelike organic micro-tremor.
 - **Russell Circumplex Affective Engine**: Stochastic Langevin diffusion across valence-arousal emotional state space coupled with autonomic vitality.
-- **On-Device TinyML Micro-Brain**: 5 homeostatic drives (*Curiosity*, *Social*, *Boredom*, *Fatigue*, *Mischief*) coupled to Markov action selection and circadian energy cycles.
-- **Episodic Latent Vector Memory**: 32-entry episodic memory bank with cosine similarity resonance and NVS flash persistence.
+- **On-Device TinyML Micro-Brain (12-Class Policy)**: 5 homeostatic drives (*Curiosity*, *Social*, *Boredom*, *Fatigue*, *Mischief*) coupled to a 12x8 feedforward neural weight matrix and Boltzmann softmax decision policy.
+- **Episodic Latent Vector Memory (12x12 Resonance Matrix)**: 32-entry episodic memory bank with cosine similarity resonance, 12x12 associative logit reinforcement, and NVS flash persistence.
 - **Hybrid Ambient Utility Glances**: Living mini-ocular companion header paired with Digital Clock, Open-Meteo Weather forecast with alternating astronomical dawn/dusk indicator (`^05:49 v17:51`), Ntfy.sh Phone Notifications with physical startle reaction, and Turn-by-Turn Navigation HUD.
 - **Real Astronomical Sunrise & Sunset Sync**: Daily astronomical ephemeris queried from Open-Meteo dynamically anchors dusk wind-down, morning awakening sequence, and ambient display dimming to actual local solar conditions.
 - **OLED Deep Sleep at Night (Anti-Burn-In)**: Automatically powers down the SSD1306 OLED panel (`lcd.sleep()`, 0xAE display off) between 01:00 and 05:30/sunrise, eliminating pixel burn-in and dark room glare. Instantly wakes with physical startle reaction for notifications or touch interactions.
 - **Weather-Aware Affective Kinetics**: Ambient rain/heat responsive Langevin emotional modulation and contemplative upward skyward gaze saccades during rainfall.
-- **Responsive Bento Grid Web UI**: Embedded Single Page Application on Port 80 for remote gaze steering, live telemetry visualization, expression control, and Web OTA updates.
+- **Responsive Bento Grid Web UI**: Embedded Single Page Application on Port 80 for remote gaze steering, live telemetry visualization, 12-expression control with Material 3 shape morphing, and Web OTA updates.
 - **Dual-Band Connectivity**: BLE Nordic UART Service (NUS) for companion phone synchronization and Wi-Fi STA with automatic SoftAP captive portal fallback (192.168.18.16).
 - **Internal SRAM Footprint**: Operates entirely within ~56.9 KB of dynamic memory (17% of internal SRAM) with PSRAM completely disabled.
 
@@ -92,8 +93,8 @@
 +---------------------------------------------------------------------------------+
 | CORE 1: oledTask (Priority 1, 60 FPS Kinematics & Rendering Loop)               |
 | - 2D Russell Circumplex Affective Engine (Valence-Arousal Langevin Diffusion)   |
-| - On-Device TinyML Micro-Brain (Homeostatic Drives & Markov Action Selection)   |
-| - Unified Rigid 2D Facial Rig (2 Expressions: IDLE, HAPPY)                      |
+| - On-Device TinyML Micro-Brain (12-Class Boltzmann Policy & Homeostatic Drives)  |
+| - Twelve-Expression Parametric Palpebral Soma (IDLE..CRYING 60 FPS Morphing)    |
 | - Coordinate Hysteresis Filtering (getFilteredOx, getFilteredOy)                |
 | - Ocular Dynamics (32.0 rad/s Underdamped Mass-Spring-Damper, zeta = 0.72)      |
 | - 5th-Order Minimum-Jerk Saccades with Post-Saccadic Glissade Rebound           |
@@ -220,7 +221,7 @@ Device configuration can be modified in `src/config/lore_config.h` or dynamicall
 | :--- | :--- | :--- | :--- |
 | `/` | `GET` | HTML | Bento Grid Control Dashboard |
 | `/telemetry` | `GET` | JSON | Full telemetry snapshot (gaze, affect, drives, memory) |
-| `/set_expression` | `POST` | `{"expr": 0..7}` | Override facial expression or `-1` for auto |
+| `/set_expression` | `POST` | `{"expr": 0..11}` | Override facial expression or `-1` for auto |
 | `/set_gaze` | `POST` | `{"x": -1..1, "y": -1..1}` | Direct gaze to normalized coordinate |
 | `/set_brightness` | `POST` | `{"brightness": 0..255}` | Adjust SSD1306 contrast brightness |
 | `/set_auto_brightness`| `POST` | `{"enabled": true}` | Toggle dynamic ambient auto-brightness |

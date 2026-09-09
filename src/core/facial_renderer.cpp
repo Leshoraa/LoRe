@@ -23,8 +23,9 @@ void set_facial_canvas(LGFX_Sprite* p_canvas) {
     }
 }
 
-static void renderOneEyeSuperellipse(LGFX_Sprite& cv, float xc, float yc, float a, float b, float n, float theta, float stroke) {
-    if (b <= 1.5f) {
+static void renderOneEyeSuperellipse(LGFX_Sprite& cv, float xc, float yc, float a, float b, float n, float theta, float stroke,
+                                    float brow_tilt, float cheek_tilt, float upper_lid, float lower_lid) {
+    if (b <= 1.5f || (1.0f - upper_lid - lower_lid) <= 0.05f) {
         int slit_w = (int)roundf(a * 2.0f);
         if (slit_w < 10) slit_w = 10;
         int left_pos = (int)roundf(xc - a);
@@ -42,6 +43,11 @@ static void renderOneEyeSuperellipse(LGFX_Sprite& cv, float xc, float yc, float 
     float b_in = b - stroke;
     bool is_hollow = (stroke > 0.5f && a_in > 1.0f && b_in > 1.0f);
 
+    float y_top_cut = b * (1.0f - upper_lid);
+    float y_bottom_cut = b * (1.0f - lower_lid);
+    float tan_brow = tanf(brow_tilt);
+    float tan_cheek = tanf(cheek_tilt);
+
     float r_max = sqrtf(a * a + b * b) + 1.0f;
     int x_min = (int)fmaxf(0.0f, floorf(xc - r_max));
     int x_max = (int)fminf((float)(OLED_PANEL_WIDTH_PX - 1), ceilf(xc + r_max));
@@ -54,6 +60,10 @@ static void renderOneEyeSuperellipse(LGFX_Sprite& cv, float xc, float yc, float 
             float dx = ((float)x + 0.5f) - xc;
             float xr = dx * cos_t + dy * sin_t;
             float yr = -dx * sin_t + dy * cos_t;
+
+            /* Fast early rejection against angled brow and cheek palpebral cutting planes */
+            if (yr < -y_top_cut + xr * tan_brow) continue;
+            if (yr > y_bottom_cut + xr * tan_cheek) continue;
 
             float u = fabsf(xr) / a;
             float v = fabsf(yr) / b;
@@ -75,20 +85,21 @@ static void renderOneEyeSuperellipse(LGFX_Sprite& cv, float xc, float yc, float 
     }
 }
 
-void drawAutonomousSoma(const OcularSomaState& soma, float offsetX, float offsetY, float palpebralAperture) {
+void drawAutonomousSoma(const OcularSomaState& soma, float offsetX, float offsetY, float palpebralAperture, float vergence) {
     if (!s_canvas_ptr) return;
     LGFX_Sprite& cv = *s_canvas_ptr;
 
     int ox = getFilteredOx(offsetX) + get_burn_shift_x();
     int oy = getFilteredOy(offsetY) + get_burn_shift_y();
+    int v_px = (int)roundf(vergence);
 
     cv.fillScreen(TFT_BLACK);
 
     float aperture = constrain(palpebralAperture, 0.0f, 1.0f);
 
-    float left_xc = soma.left_x + (float)ox + soma.nystagmus_x;
+    float left_xc = soma.left_x + (float)ox + (float)v_px + soma.nystagmus_x;
     float left_yc = soma.left_y + (float)oy + soma.nystagmus_y;
-    float right_xc = soma.right_x + (float)ox + soma.nystagmus_x;
+    float right_xc = soma.right_x + (float)ox - (float)v_px + soma.nystagmus_x;
     float right_yc = soma.right_y + (float)oy + soma.nystagmus_y;
 
     float left_a = soma.left_w * 0.5f;
@@ -96,8 +107,41 @@ void drawAutonomousSoma(const OcularSomaState& soma, float offsetX, float offset
     float right_a = soma.right_w * 0.5f;
     float right_b = soma.right_h * 0.5f * aperture;
 
-    renderOneEyeSuperellipse(cv, left_xc, left_yc, left_a, left_b, soma.left_n, soma.tilt_left, soma.stroke_thickness);
-    renderOneEyeSuperellipse(cv, right_xc, right_yc, right_a, right_b, soma.right_n, soma.tilt_right, soma.stroke_thickness);
+    renderOneEyeSuperellipse(cv, left_xc, left_yc, left_a, left_b, soma.left_n, soma.tilt_left, soma.stroke_thickness,
+                            soma.brow_tilt_left, soma.cheek_tilt_left, soma.upper_lid_left, soma.lower_lid_left);
+    renderOneEyeSuperellipse(cv, right_xc, right_yc, right_a, right_b, soma.right_n, soma.tilt_right, soma.stroke_thickness,
+                            soma.brow_tilt_right, soma.cheek_tilt_right, soma.upper_lid_right, soma.lower_lid_right);
+
+    /* Render subtle expressive accents */
+    if (g_currentExpr == EXPR_CRYING && aperture > 0.3f) {
+        static uint8_t s_tear_frame = 0;
+        s_tear_frame = (s_tear_frame + 1) % 40;
+        int tear_y_l = (int)roundf(left_yc + left_b) + (s_tear_frame % 14);
+        int tear_y_r = (int)roundf(right_yc + right_b) + ((s_tear_frame + 7) % 14);
+        int tear_x_l = (int)roundf(left_xc - left_a * 0.35f);
+        int tear_x_r = (int)roundf(right_xc + right_a * 0.35f);
+        if (tear_y_l < OLED_PANEL_HEIGHT_PX - 2) cv.fillRoundRect(tear_x_l - 1, tear_y_l, 2, 4, 1, TFT_WHITE);
+        if (tear_y_r < OLED_PANEL_HEIGHT_PX - 2) cv.fillRoundRect(tear_x_r - 1, tear_y_r, 2, 4, 1, TFT_WHITE);
+    } else if ((g_currentExpr == EXPR_HAPPY || g_currentExpr == EXPR_COOL) && aperture > 0.4f) {
+        int b_l = (int)roundf(left_xc - left_a - 4.0f);
+        int b_r = (int)roundf(right_xc + right_a + 2.0f);
+        int b_y = (int)roundf(left_yc + left_b * 0.35f);
+        if (b_l >= 2 && b_y >= 0 && b_y < OLED_PANEL_HEIGHT_PX) {
+            cv.drawPixel(b_l, b_y, TFT_WHITE);
+            cv.drawPixel(b_l + 2, b_y, TFT_WHITE);
+        }
+        if (b_r < OLED_PANEL_WIDTH_PX - 3 && b_y >= 0 && b_y < OLED_PANEL_HEIGHT_PX) {
+            cv.drawPixel(b_r, b_y, TFT_WHITE);
+            cv.drawPixel(b_r + 2, b_y, TFT_WHITE);
+        }
+    } else if (g_currentExpr == EXPR_ANGRY && aperture > 0.4f) {
+        int v_x = (int)roundf(right_xc + right_a + 5.0f);
+        int v_y = (int)roundf(right_yc - right_b * 0.5f);
+        if (v_x < OLED_PANEL_WIDTH_PX - 4 && v_y > 4 && v_y < OLED_PANEL_HEIGHT_PX - 4) {
+            cv.drawLine(v_x - 2, v_y, v_x + 2, v_y, TFT_WHITE);
+            cv.drawLine(v_x, v_y - 2, v_x, v_y + 2, TFT_WHITE);
+        }
+    }
 
     cv.pushSprite(0, 0);
 }
@@ -178,7 +222,7 @@ void drawFace(Expression expr, float eyeHeightFactor, float offsetX, float offse
 
             case EXPR_IDLE:
             default:
-                drawAutonomousSoma(getOcularSomaState(), offsetX, offsetY, h_clamped);
+                drawAutonomousSoma(getOcularSomaState(), offsetX, offsetY, h_clamped, vergence);
                 return;
         }
     }

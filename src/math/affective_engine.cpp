@@ -59,9 +59,19 @@ bool isManualExpressionActive(void) {
 
 const char* getExpressionName(Expression expr) {
     switch (expr) {
-        case EXPR_IDLE:     return "IDLE";
-        case EXPR_HAPPY:    return "HAPPY";
-        default:            return "IDLE";
+        case EXPR_IDLE:         return "IDLE";
+        case EXPR_HAPPY:        return "HAPPY";
+        case EXPR_ANGRY:        return "ANGRY";
+        case EXPR_SAD:          return "SAD";
+        case EXPR_SURPRISED:    return "SURPRISED";
+        case EXPR_SUSPICIOUS:   return "SUSPICIOUS";
+        case EXPR_CURIOUS:      return "CURIOUS";
+        case EXPR_MISCHIEF:     return "MISCHIEF";
+        case EXPR_SLEEPY:       return "SLEEPY";
+        case EXPR_COOL:         return "COOL";
+        case EXPR_DIZZY:        return "DIZZY";
+        case EXPR_CRYING:       return "CRYING";
+        default:                return "UNKNOWN";
     }
 }
 

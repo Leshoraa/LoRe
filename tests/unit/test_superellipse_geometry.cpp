@@ -18,6 +18,10 @@ struct SuperellipseParams {
     float n = 4.2f;  /* Lamé exponent */
     float theta = 0.05f; /* Tilt angle */
     float stroke = 0.0f; /* 0 = solid */
+    float brow_tilt = 0.0f;
+    float cheek_tilt = 0.0f;
+    float upper_lid = 0.0f;
+    float lower_lid = 0.0f;
 };
 
 /* Fast rasterizer test on a 128x64 virtual monochrome bitmap */
@@ -32,6 +36,12 @@ void rasterizeSuperellipse(const SuperellipseParams& p, std::vector<uint8_t>& bu
     float b_in = b - p.stroke;
     bool is_hollow = (p.stroke > 0.5f && a_in > 1.0f && b_in > 1.0f);
 
+    /* Dual-plane palpebral slant cutting lines */
+    float tan_brow = std::tan(p.brow_tilt);
+    float tan_cheek = std::tan(p.cheek_tilt);
+    float y_top_cut = b * (1.0f - p.upper_lid);
+    float y_bottom_cut = b * (1.0f - p.lower_lid);
+
     /* Compute conservative bounding box */
     float r_max = std::sqrt(a * a + b * b) + 1.0f;
     int x_min = std::max(0, (int)std::floor(p.xc - r_max));
@@ -45,6 +55,12 @@ void rasterizeSuperellipse(const SuperellipseParams& p, std::vector<uint8_t>& bu
             float dx = ((float)x + 0.5f) - p.xc;
             float xr = dx * cos_t + dy * sin_t;
             float yr = -dx * sin_t + dy * cos_t;
+
+            /* Check upper palpebral / brow slant plane */
+            if (yr < -y_top_cut + xr * tan_brow) continue;
+
+            /* Check lower palpebral / cheek slant plane */
+            if (yr > y_bottom_cut + xr * tan_cheek) continue;
 
             float u = std::fabs(xr) / a;
             float v = std::fabs(yr) / b;
@@ -118,7 +134,49 @@ int main() {
     p3.theta = 0.25f; /* ~14 degrees */
     rasterizeSuperellipse(p3, buffer);
     assert(buffer[32 * 128 + 40] == 1);
-    std::cout << "[PASS] Rotated tilted superellipse verified." << std::endl;
+    /* Test 4: Upper lid palpebral droop */
+    std::fill(buffer.begin(), buffer.end(), 0);
+    SuperellipseParams p4 = p1;
+    p4.upper_lid = 0.40f;
+    rasterizeSuperellipse(p4, buffer);
+    int droop_count = 0;
+    for (uint8_t px : buffer) droop_count += px;
+    assert(droop_count > 0 && droop_count < solid_count);
+    /* Top portion should be empty */
+    assert(buffer[(int)(p4.yc - p4.b + 2.0f) * 128 + (int)p4.xc] == 0);
+    std::cout << "[PASS] Upper lid palpebral droop verified (" << droop_count << " pixels)." << std::endl;
+
+    /* Test 5: Slanted brow plane (Angry slant) */
+    std::fill(buffer.begin(), buffer.end(), 0);
+    SuperellipseParams p5 = p1;
+    p5.brow_tilt = 0.38f;
+    p5.upper_lid = 0.25f;
+    rasterizeSuperellipse(p5, buffer);
+    /* Medial side (x > xc) should have more top clipping than lateral side (x < xc) */
+    int medial_px = 0;
+    int lateral_px = 0;
+    for (int y = 0; y < 64; ++y) {
+        for (int x = 0; x < 128; ++x) {
+            if (buffer[y * 128 + x]) {
+                if (x > (int)p5.xc) medial_px++;
+                else if (x < (int)p5.xc) lateral_px++;
+            }
+        }
+    }
+    assert(lateral_px > medial_px); /* Lateral retains more area as inner brow cuts lower */
+    std::cout << "[PASS] Slanted brow plane asymmetry verified (lateral=" << lateral_px << " > medial=" << medial_px << ")." << std::endl;
+
+    /* Test 6: Cheek squint (lower lid plane) */
+    std::fill(buffer.begin(), buffer.end(), 0);
+    SuperellipseParams p6 = p1;
+    p6.lower_lid = 0.45f;
+    rasterizeSuperellipse(p6, buffer);
+    int squint_count = 0;
+    for (uint8_t px : buffer) squint_count += px;
+    assert(squint_count > 0 && squint_count < solid_count);
+    /* Bottom portion should be empty */
+    assert(buffer[(int)(p6.yc + p6.b - 2.0f) * 128 + (int)p6.xc] == 0);
+    std::cout << "[PASS] Lower cheek plane squint verified (" << squint_count << " pixels)." << std::endl;
 
     std::cout << "[PASS] All Superellipse geometry tests passed successfully." << std::endl;
     return 0;

@@ -464,7 +464,17 @@ static const char HTML_PAGE[] PROGMEM = R"rawliteral(<!DOCTYPE html>
 
     /* Material 3 Expressive Shape Library Morphing per Expression */
     .btn-expr[data-expr="0"]:hover, .btn-expr[data-expr="0"].active { border-radius: 12px; } /* IDLE: Balanced Squircle */
-    .btn-expr[data-expr="1"]:hover, .btn-expr[data-expr="1"].active { border-radius: 16px 8px 16px 8px; } /* HAPPY: Clover / Flower */
+    .btn-expr[data-expr="1"]:hover, .btn-expr[data-expr="1"].active { border-radius: 16px 8px 16px 8px; } /* HAPPY: Clover */
+    .btn-expr[data-expr="2"]:hover, .btn-expr[data-expr="2"].active { border-radius: 4px 16px 4px 16px; } /* ANGRY: Slanted Sharp */
+    .btn-expr[data-expr="3"]:hover, .btn-expr[data-expr="3"].active { border-radius: 8px 8px 16px 16px; } /* SAD: Droop */
+    .btn-expr[data-expr="4"]:hover, .btn-expr[data-expr="4"].active { border-radius: 20px; } /* SURPRISED: Round */
+    .btn-expr[data-expr="5"]:hover, .btn-expr[data-expr="5"].active { border-radius: 6px 18px 6px 18px; } /* SUSPICIOUS: Asymmetric */
+    .btn-expr[data-expr="6"]:hover, .btn-expr[data-expr="6"].active { border-radius: 18px 6px 18px 18px; } /* CURIOUS: Cocked Brow */
+    .btn-expr[data-expr="7"]:hover, .btn-expr[data-expr="7"].active { border-radius: 16px 4px 16px 12px; } /* MISCHIEF: Smirk */
+    .btn-expr[data-expr="8"]:hover, .btn-expr[data-expr="8"].active { border-radius: 16px 16px 6px 6px; } /* SLEEPY: Heavy Top */
+    .btn-expr[data-expr="9"]:hover, .btn-expr[data-expr="9"].active { border-radius: 8px; } /* COOL: Shield */
+    .btn-expr[data-expr="10"]:hover, .btn-expr[data-expr="10"].active { border-radius: 14px 6px 14px 6px; } /* DIZZY: Twisted */
+    .btn-expr[data-expr="11"]:hover, .btn-expr[data-expr="11"].active { border-radius: 8px 8px 18px 18px; } /* CRYING: Tear */
 
     .btn-expr-auto {
       width: 100%;
@@ -994,6 +1004,16 @@ static const char HTML_PAGE[] PROGMEM = R"rawliteral(<!DOCTYPE html>
             <div class="expr-grid">
               <button type="button" class="btn-expr" data-expr="0">IDLE</button>
               <button type="button" class="btn-expr" data-expr="1">HAPPY</button>
+              <button type="button" class="btn-expr" data-expr="2">ANGRY</button>
+              <button type="button" class="btn-expr" data-expr="3">SAD</button>
+              <button type="button" class="btn-expr" data-expr="4">SURPRISED</button>
+              <button type="button" class="btn-expr" data-expr="5">SUSPICIOUS</button>
+              <button type="button" class="btn-expr" data-expr="6">CURIOUS</button>
+              <button type="button" class="btn-expr" data-expr="7">MISCHIEF</button>
+              <button type="button" class="btn-expr" data-expr="8">SLEEPY</button>
+              <button type="button" class="btn-expr" data-expr="9">COOL</button>
+              <button type="button" class="btn-expr" data-expr="10">DIZZY</button>
+              <button type="button" class="btn-expr" data-expr="11">CRYING</button>
             </div>
 
             <button type="button" id="btn-expr-auto" class="btn-expr-auto active">Default (Auto Mood)</button>

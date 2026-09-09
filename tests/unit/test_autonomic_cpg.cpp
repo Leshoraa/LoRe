@@ -8,9 +8,10 @@
 #include <cassert>
 #include <cmath>
 
-/* Standalone test definitions for global ocular gaze offsets */
+/* Standalone test definitions for global ocular gaze offsets and expression */
 float g_currentOffsetX = 0.0f;
 float g_currentOffsetY = 0.0f;
+Expression g_currentExpr = EXPR_IDLE;
 
 int main() {
     std::cout << "[TEST] Running Autonomic Engine & Matsuoka CPG validation tests..." << std::endl;
@@ -99,6 +100,49 @@ int main() {
     assert(std::fabs(soma_primary.tilt_left) < 1e-6f);
     assert(std::fabs(soma_primary.tilt_right) < 1e-6f);
     std::cout << "[PASS] Listing's Law axial torsion kinematics verified across primary and tertiary quadrants." << std::endl;
+
+    /* Verify continuous morphing into EXPR_ANGRY */
+    g_currentExpr = EXPR_ANGRY;
+    for (int i = 0; i < 30; ++i) updateAutonomicEngine(dt); /* ~500 ms, full convergence */
+    OcularSomaState soma_angry = getOcularSomaState();
+    assert(soma_angry.brow_tilt_left > 0.30f);
+    assert(soma_angry.brow_tilt_right < -0.30f);
+    assert(soma_angry.upper_lid_left > 0.20f);
+    std::cout << "[PASS] Continuous morphing to EXPR_ANGRY inward-slanted brow plane verified." << std::endl;
+
+    /* Verify continuous morphing into EXPR_SAD */
+    g_currentExpr = EXPR_SAD;
+    for (int i = 0; i < 30; ++i) updateAutonomicEngine(dt);
+    OcularSomaState soma_sad = getOcularSomaState();
+    assert(soma_sad.brow_tilt_left < -0.20f);
+    assert(soma_sad.brow_tilt_right > 0.20f);
+    std::cout << "[PASS] Continuous morphing to EXPR_SAD dejected outer-drooping brow plane verified." << std::endl;
+
+    /* Verify continuous morphing into EXPR_HAPPY */
+    g_currentExpr = EXPR_HAPPY;
+    for (int i = 0; i < 30; ++i) updateAutonomicEngine(dt);
+    OcularSomaState soma_happy = getOcularSomaState();
+    assert(soma_happy.lower_lid_left > 0.35f);
+    assert(soma_happy.lower_lid_right > 0.35f);
+    std::cout << "[PASS] Continuous morphing to EXPR_HAPPY raised lower cheek plane verified." << std::endl;
+
+    /* Verify continuous morphing into EXPR_SLEEPY */
+    g_currentExpr = EXPR_SLEEPY;
+    for (int i = 0; i < 30; ++i) updateAutonomicEngine(dt);
+    OcularSomaState soma_sleepy = getOcularSomaState();
+    assert(soma_sleepy.upper_lid_left > 0.35f);
+    assert(soma_sleepy.upper_lid_right > 0.35f);
+    std::cout << "[PASS] Continuous morphing to EXPR_SLEEPY heavy upper lid droop verified." << std::endl;
+
+    /* Return to baseline EXPR_IDLE */
+    g_currentExpr = EXPR_IDLE;
+    for (int i = 0; i < 30; ++i) updateAutonomicEngine(dt);
+    OcularSomaState soma_idle = getOcularSomaState();
+    assert(std::fabs(soma_idle.brow_tilt_left) < 0.05f);
+    assert(std::fabs(soma_idle.brow_tilt_right) < 0.05f);
+    assert(soma_idle.upper_lid_left < 0.05f);
+    assert(soma_idle.lower_lid_left < 0.05f);
+    std::cout << "[PASS] Continuous recovery to EXPR_IDLE baseline resting state verified." << std::endl;
 
     std::cout << "[PASS] All Autonomic Engine tests passed successfully." << std::endl;
     return 0;

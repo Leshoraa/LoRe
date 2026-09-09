@@ -18,22 +18,50 @@ struct BrainSim {
     float mischief = 0.40f;
     float bonding = 0.05f;
 
-    float weights[2][8] = {
-        {  0.1f, -0.4f,  0.1f,  0.2f,  0.3f, -0.2f, -0.2f,  0.1f }, // IDLE
-        {  1.8f,  0.5f,  0.3f,  1.4f, -0.8f, -0.4f,  0.4f,  0.6f }  // HAPPY
+    static constexpr int NUM_EXPR = 12;
+
+    float weights[NUM_EXPR][8] = {
+        /* 0: IDLE */
+        {  0.1f, -0.4f,  0.1f,  0.2f,  0.3f, -0.2f, -0.2f,  0.1f },
+        /* 1: HAPPY */
+        {  1.8f,  0.5f,  0.3f,  1.4f, -0.8f, -0.4f,  0.4f,  0.6f },
+        /* 2: ANGRY */
+        { -1.8f,  1.5f, -0.2f, -1.0f,  0.2f,  0.1f,  1.2f, -0.3f },
+        /* 3: SAD */
+        { -1.9f, -1.2f, -0.5f, -1.5f,  1.0f,  0.6f, -0.8f, -0.6f },
+        /* 4: SURPRISED */
+        {  0.2f,  1.8f,  1.4f,  0.3f, -1.0f, -0.8f,  0.2f,  1.2f },
+        /* 5: SUSPICIOUS */
+        { -0.6f,  0.6f,  1.2f, -0.8f,  0.3f, -0.2f,  0.8f,  0.4f },
+        /* 6: CURIOUS */
+        {  0.6f,  0.8f,  1.9f,  0.5f, -0.5f, -0.5f,  0.5f,  0.9f },
+        /* 7: MISCHIEF */
+        {  0.8f,  1.1f,  0.7f,  0.6f, -0.3f, -0.6f,  1.8f,  0.5f },
+        /* 8: SLEEPY */
+        { -0.2f, -1.8f, -0.9f, -0.4f,  0.5f,  2.0f, -0.7f, -0.5f },
+        /* 9: COOL */
+        {  1.2f, -0.2f,  0.2f,  0.8f, -0.4f, -0.3f,  0.7f,  0.3f },
+        /* 10: DIZZY */
+        { -0.5f,  1.7f, -0.4f, -0.2f, -0.6f,  1.4f,  0.3f,  0.8f },
+        /* 11: CRYING */
+        { -2.2f,  0.8f, -0.6f, -1.6f,  0.8f,  0.9f, -1.0f, -0.7f }
     };
 
-    float biases[2] = { 1.20f, -0.50f };
+    float biases[NUM_EXPR] = {
+         1.20f, -0.40f, -1.50f, -1.40f, -1.20f, -1.30f,
+        -0.80f, -1.00f, -0.60f, -1.10f, -1.60f, -1.80f
+    };
 
-    void infer(float V, float A, float prox, float probs_out[2]) {
+    void infer(float V, float A, float prox, float probs_out[NUM_EXPR]) {
         float state[8] = { V, A, curiosity, social, boredom, fatigue, mischief, prox };
-        float logits[2];
+        float logits[NUM_EXPR];
         float max_l = -999.0f;
-        for (int i = 0; i < 2; i++) {
+        for (int i = 0; i < NUM_EXPR; i++) {
             float sum = biases[i];
             for (int j = 0; j < 8; j++) sum += weights[i][j] * state[j];
 
             if (i == 1) sum += 0.8f * bonding;
+            else if (i == 9) sum += 0.3f * bonding;
 
             logits[i] = sum;
             if (sum > max_l) max_l = sum;
@@ -41,11 +69,11 @@ struct BrainSim {
 
         float tau = 0.85f;
         float sum_exp = 0.0f;
-        for (int i = 0; i < 2; i++) {
+        for (int i = 0; i < NUM_EXPR; i++) {
             probs_out[i] = std::exp((logits[i] - max_l) / tau);
             sum_exp += probs_out[i];
         }
-        for (int i = 0; i < 2; i++) probs_out[i] /= sum_exp;
+        for (int i = 0; i < NUM_EXPR; i++) probs_out[i] /= sum_exp;
     }
 };
 
@@ -53,26 +81,27 @@ int main() {
     std::cout << "[TEST] Running On-Device TinyML Micro-Brain validation suite..." << std::endl;
 
     BrainSim brain;
-    float probs[2];
+    float probs[BrainSim::NUM_EXPR];
 
     // Test 1: Softmax Probability Distribution Axiom (Sum = 1.0, non-negative)
     brain.infer(0.0f, 0.0f, 0.0f, probs);
     float sum_p = 0.0f;
-    for (int i = 0; i < 2; i++) {
+    for (int i = 0; i < BrainSim::NUM_EXPR; i++) {
         assert(probs[i] >= 0.0f && probs[i] <= 1.0f);
         sum_p += probs[i];
     }
     assert(std::fabs(sum_p - 1.0f) < 1e-5f);
-    std::cout << "[PASS] Softmax Boltzmann probability distribution axioms verified." << std::endl;
+    std::cout << "[PASS] Softmax Boltzmann probability distribution axioms verified across 12 expressions." << std::endl;
 
-    // Test 2: Calm Steady Observation -> IDLE Dominance (> 60%)
+    // Test 2: Calm Steady Observation -> IDLE Dominance (> 35% vs 8.3% uniform)
     brain.social = 0.50f;
     brain.curiosity = 0.35f;
     brain.boredom = 0.10f;
     brain.mischief = 0.30f;
+    brain.fatigue = 0.05f;
     brain.bonding = 0.10f;
     brain.infer(0.05f, 0.10f, 0.20f, probs);
-    assert(probs[0] > 0.60f); // IDLE dominant
+    assert(probs[0] > 0.35f); // IDLE dominant
     std::cout << "[PASS] Calm steady observation yields IDLE dominance." << std::endl;
 
     // Test 3: Social Playful State (High Social, High Mischief, High Bonding) -> HAPPY dominant
@@ -80,23 +109,26 @@ int main() {
     brain.mischief = 0.85f;
     brain.bonding = 0.80f;
     brain.boredom = 0.05f;
+    brain.fatigue = 0.05f;
     brain.infer(0.70f, 0.45f, 0.60f, probs);
-    assert(probs[1] > 0.60f); // HAPPY dominant
+    assert(probs[1] > 0.35f); // HAPPY dominant
     std::cout << "[PASS] Social playful state with high bonding triggers HAPPY dominance." << std::endl;
 
     // Test 4: Solitude Baseline -> IDLE dominance
     brain.social = 0.10f;
     brain.boredom = 0.70f;
     brain.mischief = 0.10f;
+    brain.fatigue = 0.10f;
     brain.bonding = 0.10f;
     brain.infer(-0.20f, 0.10f, 0.0f, probs);
-    assert(probs[0] > 0.60f); // IDLE dominant
+    assert(probs[0] > 0.35f); // IDLE dominant
     std::cout << "[PASS] Solitude baseline preserves IDLE policy dominance." << std::endl;
 
     // Test 5: Bonding sensitivity test (higher bonding increases HAPPY prob)
     brain.social = 0.60f;
     brain.mischief = 0.50f;
     brain.boredom = 0.10f;
+    brain.fatigue = 0.05f;
     brain.bonding = 0.05f;
     brain.infer(0.40f, 0.30f, 0.40f, probs);
     float happy_low_bond = probs[1];
@@ -107,7 +139,33 @@ int main() {
     assert(happy_high_bond > happy_low_bond);
     std::cout << "[PASS] Bonding progression positively modulates HAPPY expression probability." << std::endl;
 
-    // Test 6: Borbély Two-Process Biological Sleep Model Validation
+    // Test 6: Severe Fatigue -> SLEEPY dominance
+    brain.fatigue = 0.95f;
+    brain.social = 0.20f;
+    brain.curiosity = 0.10f;
+    brain.infer(-0.20f, -0.60f, 0.10f, probs);
+    assert(probs[8] > 0.30f); // SLEEPY (idx 8) dominant
+    std::cout << "[PASS] High biological fatigue triggers SLEEPY expression dominance." << std::endl;
+
+    // Test 7: Provocation / Frustration -> ANGRY dominance
+    brain.fatigue = 0.10f;
+    brain.mischief = 0.80f;
+    brain.social = 0.10f;
+    brain.curiosity = 0.20f;
+    brain.infer(-0.80f, 0.75f, 0.10f, probs);
+    assert(probs[2] > 0.30f); // ANGRY (idx 2) dominant
+    std::cout << "[PASS] Negative valence and high arousal trigger ANGRY expression dominance." << std::endl;
+
+    // Test 8: Novelty / Exploration -> CURIOUS dominance
+    brain.curiosity = 0.95f;
+    brain.social = 0.50f;
+    brain.fatigue = 0.05f;
+    brain.mischief = 0.40f;
+    brain.infer(0.30f, 0.40f, 0.80f, probs);
+    assert(probs[6] > 0.30f); // CURIOUS (idx 6) dominant
+    std::cout << "[PASS] Novelty drive triggers CURIOUS expression dominance." << std::endl;
+
+    // Test 9: Borbély Two-Process Biological Sleep Model Validation
     auto compute_sleep_pressure = [](float circadian_d, float fatigue, float boredom, float arousal) -> float {
         float raw = (0.55f * circadian_d) + (0.45f * fatigue) + (0.25f * boredom) - (0.40f * arousal);
         return std::clamp(raw, 0.0f, 1.0f);
@@ -130,7 +188,7 @@ int main() {
     assert(p_night_aroused < p_night);
     std::cout << "[PASS] Borbély Two-Process sleep pressure dynamics verified." << std::endl;
 
-    // Test 7: Biological Doze Duration Bounds
+    // Test 10: Biological Doze Duration Bounds
     auto compute_doze_ms = [](float pressure) -> float {
         return 800.0f + 1400.0f * pressure;
     };
