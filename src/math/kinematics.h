@@ -59,11 +59,19 @@ static inline float getListingTorsionAngleRad(float gazeOffsetX, float gazeOffse
     float norm_y = gazeOffsetY / kListingMaxOffsetY;
     if (norm_x < -1.0f) norm_x = -1.0f;
     if (norm_x > 1.0f) norm_x = 1.0f;
-    if (norm_y < -1.0f) norm_y = -1.0f;
-    if (norm_y > 1.0f) norm_y = 1.0f;
-
     return kListingTorsionGainRad * (norm_x * norm_y);
 }
+
+/* Affective Saccade Kinematics & Neuromuscular Tone Modulation */
+typedef struct AffectiveKinematicProfile {
+    float omega_mult;     /* Multiplier for natural frequency (stiffness / response speed) */
+    float zeta_mult;      /* Multiplier for damping ratio (springiness vs rigid stop) */
+    float duration_mult;  /* Multiplier for saccade duration */
+    float glissade_gain;  /* Glissade landing rebound amplitude */
+} AffectiveKinematicProfile;
+
+void setAffectiveKinematicsProfile(Expression expr);
+AffectiveKinematicProfile getActiveAffectiveKinematicProfile(void);
 
 #ifdef __cplusplus
 }

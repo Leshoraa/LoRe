@@ -51,6 +51,7 @@ run_test "test_ble_telemetry"
 run_test "test_notification_parser" "${ROOT_DIR}/src/net/net_utils.cpp"
 run_test "test_autonomic_cpg" "${ROOT_DIR}/src/ai/autonomic_engine.cpp"
 run_test "test_superellipse_geometry"
+run_test "test_affective_kinematics"
 
 echo "[TEST] Summary: ${PASSED} Passed, ${FAILED} Failed"
 

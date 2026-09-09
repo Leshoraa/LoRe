@@ -289,3 +289,36 @@ Logits are converted to a stochastic decision distribution via Boltzmann softmax
 $$P(E_i) = \frac{e^{(z_i - z_{\max}) / \tau_{\text{boltz}}}}{\sum_{k=1}^{12} e^{(z_k - z_{\max}) / \tau_{\text{boltz}}}} \quad (\tau_{\text{boltz}} = 0.85)$$
 Expression policy selection samples from this categorical distribution, ensuring dynamic, autonomous behavioral diversity without repetitive deterministic loops.
 
+---
+
+## 12. Affective Saccade Kinematics, 3D Cornea Parallax, and Ambient Micro-Particles
+
+### 12.1 Affective Saccade Kinematics & Neuromuscular Tone
+Ballistic and smooth ocular movements dynamically modulate their biomechanical parameters according to the active emotional archetype $E \in [0, 11]$:
+- **Ballistic Duration Scaling:**
+  $$D_{\text{saccade}} = (D_0 + K \cdot \Delta\theta) \cdot D_{\text{mult}}(E)$$
+  where $D_0 = 80\text{ ms}$, $K = 2.4\text{ ms/deg}$. Surprised startle triggers hyper-fast gazes ($D_{\text{mult}} = 0.65$), while sleepy states induce heavy viscous glides ($D_{\text{mult}} = 1.60$).
+- **Post-Saccadic Elastic Glissade Overshoot:**
+  $$s(\tau) = s_{\text{jerk}}(\tau) + A_{\text{glissade}}(E) \cdot \sin\left(\pi \frac{\tau - 0.70}{0.30}\right) \cdot e^{-3.5(\tau - 0.70)} \cdot \mathbf{1}_{\tau > 0.70}$$
+  Angry states snap to a dead stop with zero overshoot ($A_{\text{glissade}} = 0.005$), while playful mischief and happy states exhibit soft-tissue compliance rebounds ($A_{\text{glissade}} \in [0.065, 0.070]$).
+- **Target Tracking Mass-Spring-Damper Modulation:**
+  $$\ddot{\mathbf{x}} = (\omega_n \cdot \omega_{\text{mult}}(E))^2 (\mathbf{x}^* - \mathbf{x}) - 2 (\zeta \cdot \zeta_{\text{mult}}(E)) (\omega_n \cdot \omega_{\text{mult}}(E)) \dot{\mathbf{x}}$$
+  Stiffness $\omega_n$ escalates during angry confrontation and fear, while damping $\zeta$ reduces during joyful bounce.
+
+### 12.2 3D Convex Cornea Parallax Reflection Model
+To overcome the perceptual flatness of 2D solid white superellipses on monochrome OLED panels, a negative-space corneal specular catchlight ($2 \times 2\text{ px}$, `TFT_BLACK`) is rasterized within the ocular body.
+Under a stationary distant ambient light source, rotating a convex 3D spherical cornea by gaze offset $(ox, oy)$ causes the specular highlight to shift relative to the cornea center with an inverse parallax displacement:
+$$\Delta x_{\text{catchlight}} = -ox \cdot (1.0 - k_{\text{parallax}})$$
+$$\Delta y_{\text{catchlight}} = -oy \cdot (1.0 - k_{\text{parallax}})$$
+where $k_{\text{parallax}} = 0.45$.
+- **Perceived Depth:** In world coordinates, the highlight advances at $+0.45 \cdot ox$ while the eyeball shifts at $+1.0 \cdot ox$, providing unmistakable visual perception of a protruding 3D spherical convex dome.
+- **Palpebral Occlusion:** Highlight rendering is naturally suppressed when palpebral aperture $\le 0.38$, simulating anatomical shielding under the upper tarsal plate.
+
+### 12.3 Zero-Allocation Ambient Micro-Particle Dynamics
+Atmospheric emotional particles are simulated through a static 4-slot ring buffer ($\le 128\text{ bytes}$ `.bss` memory, zero dynamic heap allocation):
+$$\mathbf{p}_{t+\Delta t} = \mathbf{p}_t + \mathbf{v} \cdot \Delta t$$
+$$L_{t+\Delta t} = L_t - r_{\text{decay}} \cdot \Delta t$$
+- **`PARTICLE_ZZZ`:** Drifting up-right ($v_x = 3.5, v_y = -5.0$) during sleepiness or Borbély microsleep struggle.
+- **`PARTICLE_HEART`:** Upward floating heart ($5 \times 5\text{ px}$) with sinusoidal horizontal wobble ($\Delta x = 1.5 \sin(2\pi L)$) triggered by high companionship bonding ($> 0.55$) in `EXPR_HAPPY`.
+- **`PARTICLE_SWEAT`:** Downward dripping droplet ($3 \times 4\text{ px}$, $v_y = +4.0$) on temporal brow during suspicion or surprise.
+- **State Cleanup:** Expression transitions flush all active particles via `clearOcularParticles()` to prevent emotional bleed.

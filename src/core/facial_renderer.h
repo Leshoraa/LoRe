@@ -14,5 +14,6 @@ void drawAutonomousSoma(const OcularSomaState& soma, float offsetX, float offset
 void drawFace(Expression expr, float eyeHeightFactor, float offsetX, float offsetY, float frame = 0.0f, float vergence = 0.0f, float scale = 1.0f);
 void drawMiniFace(Expression expr, float eyeHeightFactor, float offsetX, float offsetY, float scale = 0.5f);
 void transitionExpression(Expression fromExpr, Expression toExpr, float durationMs = 170.0f);
+void clearOcularParticles(void);
 
 #endif /* LORE_FACIAL_RENDERER_H */

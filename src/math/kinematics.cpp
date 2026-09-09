@@ -73,10 +73,42 @@ static const float kLevyWideMinRadiusPx = 9.5f;
 static const float kLevyWideMaxRadiusPx = 15.0f;
 
 /* Post-Saccadic Ocular Glissade Constants (Extraocular Soft-Tissue Compliance) */
-static const float kGlissadeReboundGain = GLISSADE_REBOUND_GAIN;
 static const float kGlissadeOnsetTau = 0.70f;
 static const float kGlissadeDecayLambda = 3.5f;
 static const float kGlissadeMaxOvershoot = 1.06f;
+
+/* Affective Saccade Kinematics Modulation Table */
+static const AffectiveKinematicProfile kAffectiveKinematicTable[NUM_EXPRESSIONS] = {
+    /* 0: EXPR_IDLE - Baseline balanced organic kinematics */
+    { 1.00f, 1.00f, 1.00f, 0.045f },
+    /* 1: EXPR_HAPPY - Springy, light, cheerful bounce */
+    { 1.15f, 0.82f, 0.88f, 0.065f },
+    /* 2: EXPR_ANGRY - Hyper-fast, aggressive snap, dead-stop rigid settling */
+    { 1.40f, 1.30f, 0.70f, 0.005f },
+    /* 3: EXPR_SAD - Sluggish, dejected drag, low velocity */
+    { 0.75f, 1.10f, 1.45f, 0.020f },
+    /* 4: EXPR_SURPRISED - Instantaneous startle snap, rapid fixation lock */
+    { 1.50f, 1.00f, 0.65f, 0.030f },
+    /* 5: EXPR_SUSPICIOUS - Controlled, guarded, scrutinizing glance */
+    { 1.10f, 1.25f, 1.15f, 0.010f },
+    /* 6: EXPR_CURIOUS - Inquisitive darting flicks */
+    { 1.20f, 0.90f, 0.85f, 0.055f },
+    /* 7: EXPR_MISCHIEF - Playful, cheeky overshoot */
+    { 1.25f, 0.78f, 0.80f, 0.070f },
+    /* 8: EXPR_SLEEPY - Heavily damped, slow viscous glide */
+    { 0.65f, 1.20f, 1.60f, 0.015f },
+    /* 9: EXPR_COOL - Smooth, relaxed, effortless swagger */
+    { 0.95f, 1.05f, 1.10f, 0.035f },
+    /* 10: EXPR_DIZZY - Uncoordinated wobbling glide */
+    { 0.80f, 0.70f, 1.30f, 0.080f },
+    /* 11: EXPR_CRYING - Trembling, sorrowful gaze shifts */
+    { 0.85f, 0.95f, 1.35f, 0.040f }
+};
+
+static float s_active_omega_mult = 1.0f;
+static float s_active_zeta_mult = 1.0f;
+static float s_active_dur_mult = 1.0f;
+static float s_active_glissade = 0.045f;
 
 static bool s_prevTargetDetected = false;
 static float s_deadbandTargetX = 0.0f;
@@ -95,7 +127,7 @@ float eval_minimum_jerk_spline(float p) {
     if (p > kGlissadeOnsetTau) {
         float delta_tau = p - kGlissadeOnsetTau;
         float norm_tail = delta_tau / (1.0f - kGlissadeOnsetTau);
-        float glissade = kGlissadeReboundGain * sinf(norm_tail * 3.14159265f) * expf(-kGlissadeDecayLambda * delta_tau);
+        float glissade = s_active_glissade * sinf(norm_tail * 3.14159265f) * expf(-kGlissadeDecayLambda * delta_tau);
         base_spline += glissade;
     }
     return constrain(base_spline, 0.0f, kGlissadeMaxOvershoot);
@@ -103,9 +135,9 @@ float eval_minimum_jerk_spline(float p) {
 
 uint32_t compute_saccade_duration_ms(float displacement_px) {
     float deg = fabsf(displacement_px) * PX_TO_DEG_FACTOR;
-    float dur = SACCADE_D0_MS + SACCADE_K_MS_PER_DEG * deg;
-    if (dur < 110.0f) dur = 110.0f;
-    if (dur > 260.0f) dur = 260.0f;
+    float dur = (SACCADE_D0_MS + SACCADE_K_MS_PER_DEG * deg) * s_active_dur_mult;
+    if (dur < 75.0f) dur = 75.0f;
+    if (dur > 380.0f) dur = 380.0f;
     return (uint32_t)dur;
 }
 
@@ -209,6 +241,17 @@ void updateGazeSystem(void) {
     if (dt < 0.005f) dt = 0.005f;
     if (dt > 0.040f) dt = 0.040f;
     lastGazeTimeUs = nowUs;
+
+    /* Affective Saccade Kinematics Smooth Interpolation (Rate ~12.0 rad/s) */
+    Expression curExpr = g_currentExpr;
+    if ((int)curExpr >= 0 && (int)curExpr < NUM_EXPRESSIONS) {
+        const AffectiveKinematicProfile* targetProf = &kAffectiveKinematicTable[curExpr];
+        float alpha_k = 1.0f - expf(-12.0f * dt);
+        s_active_omega_mult += (targetProf->omega_mult - s_active_omega_mult) * alpha_k;
+        s_active_zeta_mult += (targetProf->zeta_mult - s_active_zeta_mult) * alpha_k;
+        s_active_dur_mult += (targetProf->duration_mult - s_active_dur_mult) * alpha_k;
+        s_active_glissade += (targetProf->glissade_gain - s_active_glissade) * alpha_k;
+    }
 
     bool targetActive = (g_recon_state == STATE_ACTIVE) && (target.detected || ((now - target.last_seen_ms) < 300 && target.last_seen_ms > 0));
 
@@ -361,9 +404,9 @@ void updateGazeSystem(void) {
                 g_currentOffsetY = s_trackSaccadeStartY + (distY * s);
             }
         } else {
-            /* Personality-modulated spring-damper parameters */
-            float omega_n = getPersonalityGazeOmega();
-            float zeta = getPersonalityGazeDamping();
+            /* Personality- and Affective-modulated spring-damper parameters */
+            float omega_n = getPersonalityGazeOmega() * s_active_omega_mult;
+            float zeta = getPersonalityGazeDamping() * s_active_zeta_mult;
 
             float ax = (omega_n * omega_n) * (s_smoothedTargetX - g_currentOffsetX) - (2.0f * zeta * omega_n) * s_eye_vx;
             float ay = (omega_n * omega_n) * (s_smoothedTargetY - g_currentOffsetY) - (2.0f * zeta * omega_n) * s_eye_vy;
@@ -782,3 +825,21 @@ void updateDrowsyEyelidKinematics(float dt_sec, float sleep_pressure, float voli
     s_drowsy_nod_y = constrain(s_drowsy_nod_y, 0.0f, kMaxNodOffsetPx);
 }
 
+void setAffectiveKinematicsProfile(Expression expr) {
+    if ((int)expr >= 0 && (int)expr < NUM_EXPRESSIONS) {
+        const AffectiveKinematicProfile* prof = &kAffectiveKinematicTable[expr];
+        s_active_omega_mult = prof->omega_mult;
+        s_active_zeta_mult = prof->zeta_mult;
+        s_active_dur_mult = prof->duration_mult;
+        s_active_glissade = prof->glissade_gain;
+    }
+}
+
+AffectiveKinematicProfile getActiveAffectiveKinematicProfile(void) {
+    AffectiveKinematicProfile prof;
+    prof.omega_mult = s_active_omega_mult;
+    prof.zeta_mult = s_active_zeta_mult;
+    prof.duration_mult = s_active_dur_mult;
+    prof.glissade_gain = s_active_glissade;
+    return prof;
+}

@@ -12,10 +12,71 @@
 #include "src/math/affective_engine.h"
 #include "src/math/kinematics.h"
 #include "src/ai/autonomic_engine.h"
+#include "src/ai/brain_engine.h"
 #include <Arduino.h>
 #include <math.h>
 
 static LGFX_Sprite* s_canvas_ptr = &canvas;
+
+/* 3D Parallax Cornea Catchlight Constants */
+static const float kParallaxRatio = 0.45f;
+static const float kBaseCatchlightOffsetX = -3.5f;
+static const float kBaseCatchlightOffsetY = -3.5f;
+static const int kCatchlightWidthPx = 2;
+static const int kCatchlightHeightPx = 2;
+static const float kCatchlightMinAperture = 0.38f;
+static const float kCatchlightMaxRadSq = 0.65f;
+
+/* Ambient Micro-Particle Accent System */
+enum ParticleType {
+    PARTICLE_NONE = 0,
+    PARTICLE_ZZZ,
+    PARTICLE_HEART,
+    PARTICLE_SWEAT
+};
+
+struct OcularParticle {
+    float x;
+    float y;
+    float vx;
+    float vy;
+    float life;
+    float decay_rate;
+    ParticleType type;
+    bool active;
+};
+
+static const int kMaxParticles = 4;
+static OcularParticle s_particles[kMaxParticles] = {};
+static uint32_t s_lastParticleSpawnTime = 0;
+static uint32_t s_lastParticleUpdateTimeUs = 0;
+
+static const uint32_t kZzzSpawnIntervalMs = 1300;
+static const uint32_t kHeartSpawnIntervalMs = 2200;
+static const uint32_t kSweatSpawnIntervalMs = 1900;
+
+static void spawnParticle(ParticleType type, float x, float y, float vx, float vy, float decay_rate) {
+    for (int i = 0; i < kMaxParticles; ++i) {
+        if (!s_particles[i].active) {
+            s_particles[i].x = x;
+            s_particles[i].y = y;
+            s_particles[i].vx = vx;
+            s_particles[i].vy = vy;
+            s_particles[i].life = 1.0f;
+            s_particles[i].decay_rate = decay_rate;
+            s_particles[i].type = type;
+            s_particles[i].active = true;
+            return;
+        }
+    }
+}
+
+void clearOcularParticles(void) {
+    for (int i = 0; i < kMaxParticles; ++i) {
+        s_particles[i].active = false;
+    }
+    s_lastParticleSpawnTime = 0;
+}
 
 void set_facial_canvas(LGFX_Sprite* p_canvas) {
     if (p_canvas) {
@@ -85,6 +146,149 @@ static void renderOneEyeSuperellipse(LGFX_Sprite& cv, float xc, float yc, float 
     }
 }
 
+static void renderCorneaCatchlights(LGFX_Sprite& cv, float left_xc, float left_yc, float right_xc, float right_yc,
+                                    float left_a, float left_b, float right_a, float right_b,
+                                    float ox, float oy, float aperture, float stroke_thickness) {
+    if (aperture < kCatchlightMinAperture || stroke_thickness > 0.5f || left_b <= 2.0f || right_b <= 2.0f) {
+        return;
+    }
+
+    /* Convex 3D Cornea Parallax Displacement */
+    float delta_glint_x = -(float)ox * (1.0f - kParallaxRatio);
+    float delta_glint_y = -(float)oy * (1.0f - kParallaxRatio);
+
+    float glint_lx = left_xc + kBaseCatchlightOffsetX + delta_glint_x;
+    float glint_ly = left_yc + kBaseCatchlightOffsetY + delta_glint_y;
+    float glint_rx = right_xc + kBaseCatchlightOffsetX + delta_glint_x;
+    float glint_ry = right_yc + kBaseCatchlightOffsetY + delta_glint_y;
+
+    if (g_currentExpr == EXPR_DIZZY) {
+        uint32_t t_ms = millis();
+        float angle = (float)(t_ms % 800) * (2.0f * 3.14159265f / 800.0f);
+        glint_lx += 3.5f * cosf(angle);
+        glint_ly += 3.5f * sinf(angle);
+        glint_rx += 3.5f * cosf(angle + 3.14159265f);
+        glint_ry += 3.5f * sinf(angle + 3.14159265f);
+    }
+
+    int glint_w = (g_currentExpr == EXPR_SLEEPY) ? 1 : kCatchlightWidthPx;
+    int glint_h = (g_currentExpr == EXPR_SLEEPY) ? 1 : kCatchlightHeightPx;
+
+    /* Check containment inside left cornea */
+    float dx_l = glint_lx - left_xc;
+    float dy_l = glint_ly - left_yc;
+    float norm_dist_l = (dx_l * dx_l) / (left_a * left_a) + (dy_l * dy_l) / (left_b * left_b);
+    if (norm_dist_l <= kCatchlightMaxRadSq) {
+        cv.fillRect((int)roundf(glint_lx), (int)roundf(glint_ly), glint_w, glint_h, TFT_BLACK);
+    }
+
+    /* Check containment inside right cornea */
+    float dx_r = glint_rx - right_xc;
+    float dy_r = glint_ry - right_yc;
+    float norm_dist_r = (dx_r * dx_r) / (right_a * right_a) + (dy_r * dy_r) / (right_b * right_b);
+    if (norm_dist_r <= kCatchlightMaxRadSq) {
+        cv.fillRect((int)roundf(glint_rx), (int)roundf(glint_ry), glint_w, glint_h, TFT_BLACK);
+    }
+}
+
+static void updateAndRenderParticles(LGFX_Sprite& cv, float left_xc, float left_yc, float right_xc, float right_yc,
+                                    float left_a, float left_b, float right_a, float right_b, float aperture) {
+    (void)left_b;
+    (void)right_b;
+    (void)aperture;
+    uint32_t now = millis();
+    uint32_t nowUs = micros();
+    float dt = (s_lastParticleUpdateTimeUs > 0) ? (float)(nowUs - s_lastParticleUpdateTimeUs) * 0.000001f : 0.01666f;
+    if (dt < 0.005f) dt = 0.005f;
+    if (dt > 0.050f) dt = 0.050f;
+    s_lastParticleUpdateTimeUs = nowUs;
+
+    /* Autonomous Particle Spawning */
+    if (g_currentExpr == EXPR_SLEEPY || isDrowsyStruggleActive()) {
+        if (now - s_lastParticleSpawnTime >= kZzzSpawnIntervalMs) {
+            s_lastParticleSpawnTime = now;
+            float spawn_x = right_xc + right_a * 0.6f + (float)(esp_random() % 6);
+            float spawn_y = right_yc - 10.0f - (float)(esp_random() % 4);
+            float vx = 3.5f + (float)(esp_random() % 15) * 0.1f;
+            float vy = -5.0f - (float)(esp_random() % 15) * 0.1f;
+            spawnParticle(PARTICLE_ZZZ, spawn_x, spawn_y, vx, vy, 0.45f);
+        }
+    } else if (g_currentExpr == EXPR_HAPPY) {
+        float bonding = getBrainBondingLevel();
+        if (bonding >= 0.55f && (now - s_lastParticleSpawnTime >= kHeartSpawnIntervalMs)) {
+            s_lastParticleSpawnTime = now;
+            float spawn_x = right_xc + right_a + 2.0f + (float)(esp_random() % 4);
+            float spawn_y = right_yc - (float)(esp_random() % 6);
+            float vx = 1.0f + (float)(esp_random() % 10) * 0.1f;
+            float vy = -4.5f - (float)(esp_random() % 10) * 0.1f;
+            spawnParticle(PARTICLE_HEART, spawn_x, spawn_y, vx, vy, 0.50f);
+        }
+    } else if (g_currentExpr == EXPR_SUSPICIOUS || g_currentExpr == EXPR_SURPRISED) {
+        if (now - s_lastParticleSpawnTime >= kSweatSpawnIntervalMs) {
+            s_lastParticleSpawnTime = now;
+            float spawn_x = left_xc - left_a - 4.0f;
+            float spawn_y = left_yc - 8.0f;
+            float vx = -0.5f;
+            float vy = 4.0f + (float)(esp_random() % 10) * 0.1f;
+            spawnParticle(PARTICLE_SWEAT, spawn_x, spawn_y, vx, vy, 0.70f);
+        }
+    }
+
+    /* Update & Render Active Particles */
+    for (int i = 0; i < kMaxParticles; ++i) {
+        if (!s_particles[i].active) continue;
+
+        OcularParticle& p = s_particles[i];
+        p.x += p.vx * dt;
+        p.y += p.vy * dt;
+        p.life -= p.decay_rate * dt;
+
+        if (p.life <= 0.0f || p.y < -6.0f || p.y > (float)(OLED_PANEL_HEIGHT_PX + 6) ||
+            p.x < -6.0f || p.x > (float)(OLED_PANEL_WIDTH_PX + 6)) {
+            p.active = false;
+            continue;
+        }
+
+        int px = (int)roundf(p.x);
+        int py = (int)roundf(p.y);
+
+        switch (p.type) {
+            case PARTICLE_ZZZ: {
+                if (px >= 0 && px <= OLED_PANEL_WIDTH_PX - 4 && py >= 0 && py <= OLED_PANEL_HEIGHT_PX - 4) {
+                    cv.drawFastHLine(px, py, 4, TFT_WHITE);
+                    cv.drawLine(px + 3, py, px, py + 3, TFT_WHITE);
+                    cv.drawFastHLine(px, py + 3, 4, TFT_WHITE);
+                }
+                break;
+            }
+            case PARTICLE_HEART: {
+                int hx = px + (int)roundf(sinf(p.life * 6.28318f) * 1.5f);
+                int hy = py;
+                if (hx >= 0 && hx <= OLED_PANEL_WIDTH_PX - 5 && hy >= 0 && hy <= OLED_PANEL_HEIGHT_PX - 5) {
+                    cv.drawPixel(hx + 1, hy, TFT_WHITE);
+                    cv.drawPixel(hx + 3, hy, TFT_WHITE);
+                    cv.drawFastHLine(hx, hy + 1, 5, TFT_WHITE);
+                    cv.drawFastHLine(hx, hy + 2, 5, TFT_WHITE);
+                    cv.drawFastHLine(hx + 1, hy + 3, 3, TFT_WHITE);
+                    cv.drawPixel(hx + 2, hy + 4, TFT_WHITE);
+                }
+                break;
+            }
+            case PARTICLE_SWEAT: {
+                if (px >= 0 && px <= OLED_PANEL_WIDTH_PX - 3 && py >= 0 && py <= OLED_PANEL_HEIGHT_PX - 4) {
+                    cv.drawPixel(px + 1, py, TFT_WHITE);
+                    cv.drawFastHLine(px, py + 1, 3, TFT_WHITE);
+                    cv.drawFastHLine(px, py + 2, 3, TFT_WHITE);
+                    cv.drawPixel(px + 1, py + 3, TFT_WHITE);
+                }
+                break;
+            }
+            default:
+                break;
+        }
+    }
+}
+
 void drawAutonomousSoma(const OcularSomaState& soma, float offsetX, float offsetY, float palpebralAperture, float vergence) {
     if (!s_canvas_ptr) return;
     LGFX_Sprite& cv = *s_canvas_ptr;
@@ -111,6 +315,11 @@ void drawAutonomousSoma(const OcularSomaState& soma, float offsetX, float offset
                             soma.brow_tilt_left, soma.cheek_tilt_left, soma.upper_lid_left, soma.lower_lid_left);
     renderOneEyeSuperellipse(cv, right_xc, right_yc, right_a, right_b, soma.right_n, soma.tilt_right, soma.stroke_thickness,
                             soma.brow_tilt_right, soma.cheek_tilt_right, soma.upper_lid_right, soma.lower_lid_right);
+
+    /* Render 3D Parallax Cornea Catchlights */
+    renderCorneaCatchlights(cv, left_xc, left_yc, right_xc, right_yc,
+                           left_a, left_b, right_a, right_b,
+                           (float)ox, (float)oy, aperture, soma.stroke_thickness);
 
     /* Render subtle expressive accents */
     if (g_currentExpr == EXPR_CRYING && aperture > 0.3f) {
@@ -142,6 +351,10 @@ void drawAutonomousSoma(const OcularSomaState& soma, float offsetX, float offset
             cv.drawLine(v_x, v_y - 2, v_x, v_y + 2, TFT_WHITE);
         }
     }
+
+    /* Render ambient micro-particles */
+    updateAndRenderParticles(cv, left_xc, left_yc, right_xc, right_yc,
+                            left_a, left_b, right_a, right_b, aperture);
 
     cv.pushSprite(0, 0);
 }
@@ -218,6 +431,9 @@ void drawFace(Expression expr, float eyeHeightFactor, float offsetX, float offse
                         cv.clearClipRect();
                     }
                 }
+                updateAndRenderParticles(cv, (float)left_x + eye_w * 0.5f, 31.0f + (float)oy,
+                                        (float)right_x + eye_w * 0.5f, 31.0f + (float)oy,
+                                        eye_w * 0.5f, 8.0f, eye_w * 0.5f, 8.0f, h_clamped);
                 break;
 
             case EXPR_IDLE:
@@ -280,6 +496,7 @@ void drawMiniFace(Expression expr, float eyeHeightFactor, float offsetX, float o
 void transitionExpression(Expression fromExpr, Expression toExpr, float durationMs) {
     if (fromExpr == toExpr) return;
     if (!s_canvas_ptr) return;
+    clearOcularParticles();
 
     /* Execute smooth natural blink transition between distinct bitmap expressions */
     int steps = 10;
@@ -312,4 +529,5 @@ void transitionExpression(Expression fromExpr, Expression toExpr, float duration
     }
 
     g_currentExpr = toExpr;
+    clearOcularParticles();
 }
