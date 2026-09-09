@@ -312,17 +312,18 @@ $$L_{t+\Delta t} = L_t - r_{\text{decay}} \cdot \Delta t$$
 - **`PARTICLE_ZZZ`:** Drifting up-right ($v_x = 3.5, v_y = -5.0$) during sleepiness or Borbély microsleep struggle.
 - **`PARTICLE_HEART`:** Upward floating heart ($5 \times 5\text{ px}$) with sinusoidal horizontal wobble ($\Delta x = 1.5 \sin(2\pi L)$) triggered by high companionship bonding ($> 0.55$) in `EXPR_HAPPY`.
 - **`PARTICLE_SWEAT`:** Downward dripping droplet ($3 \times 4\text{ px}$, $v_y = +4.0$) on temporal brow during suspicion or surprise.
-- **`PARTICLE_STAR`:** Twinkling 4-point cartoon cross star ($5 \times 5\text{ px}$, $v_y = -3.5$) with lateral wobble ($\Delta x = 1.5 \cos(4\pi L)$) and diagonal core flashes during disorientation in `EXPR_DIZZY`.
 - **State Cleanup:** Expression transitions flush all active particles via `clearOcularParticles()` to prevent emotional bleed.
 
 ### 12.3 Hypnotic Archimedean Spiral Swirl & Orbital Wobble Kinematics
-For `EXPR_DIZZY`, static circular geometry is replaced by continuous dynamic Archimedean spiral oculi:
-$$r(\theta) = r_{\min} + (r_{\max} - r_{\min}) \cdot \frac{\theta}{\theta_{\max}}, \quad \theta \in [0, 4\pi]$$
+For `EXPR_DIZZY`, static circular geometry is replaced by continuous dynamic, borderless Archimedean spiral oculi:
+$$r(\theta) = r_{\min} + (r_{\max} - r_{\min}) \cdot \frac{\theta}{\theta_{\max}}, \quad \theta \in [0, 6\pi] \text{ (3 full rotational coils)}$$
 $$\begin{bmatrix} x \\ y \end{bmatrix} = \begin{bmatrix} x_c(t) + r(\theta) \cos(\theta + \phi(t)) \\ y_c(t) + r(\theta) \sin(\theta + \phi(t)) \cdot \text{aperture} \end{bmatrix}$$
 - **Opposing Rotational Phase:**
-  $$\phi_{\text{left}}(t) = +\omega_{\text{spin}} \cdot t, \quad \phi_{\text{right}}(t) = -\omega_{\text{spin}} \cdot t \quad (\omega_{\text{spin}} = 0.007\text{ rad/ms} \approx 67\text{ RPM})$$
+  $$\phi_{\text{left}}(t) = +\omega_{\text{spin}} \cdot t, \quad \phi_{\text{right}}(t) = -\omega_{\text{spin}} \cdot t \quad (\omega_{\text{spin}} = 0.006\text{ rad/ms} \approx 57\text{ RPM})$$
 - **Asynchronous Orbital Wobble:**
   The eye centers follow an out-of-phase elliptical orbit to simulate drunken/rolling ocular vertigo:
   $$\Delta x_{\text{left}}(t) = A_{\text{wobble}} \cos(\omega_{\text{wobble}} t), \quad \Delta y_{\text{left}}(t) = A_{\text{wobble}} \sin(\omega_{\text{wobble}} t)$$
   $$\Delta x_{\text{right}}(t) = A_{\text{wobble}} \cos(\omega_{\text{wobble}} t + \pi), \quad \Delta y_{\text{right}}(t) = A_{\text{wobble}} \sin(\omega_{\text{wobble}} t + \pi)$$
-  where $A_{\text{wobble}} = 2.5\text{ px}$ and $\omega_{\text{wobble}} = 0.006\text{ rad/ms}$.
+  where $A_{\text{wobble}} = 2.0\text{ px}$ and $\omega_{\text{wobble}} = 0.005\text{ rad/ms}$.
+- **Palpebral Blush Accents:**
+  Centered directly beneath each spiral eye at $y_{\text{blush}} = y_c + r_{\max} + 3.5\text{ px}$, an anime-style smooth filled oval ($r_x = 5\text{ px}, r_y = 2\text{ px}$) renders the blushing cheek signature without oral mouth clutter.
