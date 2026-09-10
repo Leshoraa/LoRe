@@ -170,6 +170,23 @@ void updateBiologicalMoodEngine(void) {
         float motion_factor = fminf(1.0f, (fabsf(target.vx) + fabsf(target.vy)) * 0.02f);
         target_a = (0.18f + 0.12f * target.proximity + 0.35f * motion_factor) * circa.energy_level;
         target_v = 0.20f + 0.40f * bonding + circa.mood_baseline;
+    } else {
+        /* Solitude Restlessness & Spontaneous Playfulness:
+         * Boredom and curiosity generate continuous endogenous arousal and exploratory valence drift,
+         * strictly gated by Borbély biological sleep debt (Process S).
+         * When sleep pressure is high, sleep_gate vanishes -> peace and drowsiness strictly dominate.
+         */
+        float sleep_pressure = getBiologicalSleepPressure();
+        float awake_vitality = fmaxf(0.0f, 1.0f - sleep_pressure);
+        float sleep_gate = awake_vitality * awake_vitality;
+
+        BrainTelemetry brain_tel = getBrainTelemetry();
+        float boredom = brain_tel.drives.boredom;
+        float mischief = brain_tel.drives.mischief;
+        float curiosity = brain_tel.drives.curiosity;
+
+        target_a += (0.14f * boredom * mischief + 0.06f * curiosity) * sleep_gate;
+        target_v += (0.08f * (curiosity - 0.20f) + 0.04f * mischief) * sleep_gate;
     }
 
     float tau_v = AFFECTIVE_TAU_VALENCE_S;

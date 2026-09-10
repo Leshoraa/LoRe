@@ -499,10 +499,16 @@ void updateGazeSystem(void) {
                 s_targetOffsetX = ((float)(esp_random() % 40) - 20.0f) * 0.1f;
                 s_targetOffsetY = -5.0f - (float)(esp_random() % 35) * 0.1f;
             } else {
-                /* Lévy Flight Free Exploration: heavy-tailed step distribution modulated by curiosity */
+                /* Lévy Flight Free Exploration: heavy-tailed step distribution modulated by curiosity & sleep-gated restlessness */
                 float curiosity = getBrainCuriosityDrive();
-                float p_wide = kLevyWideBaseProb + kLevyWideCuriosityGain * curiosity;
-                float p_med = kLevyMedBaseProb + kLevyMedCuriosityGain * curiosity;
+                float sleep_pressure = getBiologicalSleepPressure();
+                float awake_vitality = fmaxf(0.0f, 1.0f - sleep_pressure);
+                float sleep_gate = awake_vitality * awake_vitality;
+                BrainTelemetry b_tel = getBrainTelemetry();
+                float boredom = b_tel.drives.boredom;
+
+                float p_wide = kLevyWideBaseProb + kLevyWideCuriosityGain * curiosity + 0.08f * boredom * sleep_gate;
+                float p_med = kLevyMedBaseProb + kLevyMedCuriosityGain * curiosity + 0.04f * boredom * sleep_gate;
                 float roll = (float)(esp_random() % 1000) * 0.001f;
 
                 float step_radius = 0.0f;

@@ -2,6 +2,19 @@
 
 All notable changes to the LoRe firmware project will be documented in this file.
 
+## [1.4.0] - 2026-09-10
+
+### Added
+- First-Principles Continuous Sleep-Gated Restlessness & Spontaneous Solitude Play:
+  - 100% endogenous behavioral agency driven purely by homeostatic drives, Langevin emotional diffusion, and circadian rhythm without external web or notification dependency.
+  - Quadratic Biological Sleep-Gating Function ($\text{sleep\_gate} = \max(0.0, 1.0 - P_{\text{sleep}})^2$): ensures Borbély sleep pressure (Process S + Process C) strictly inhibits restlessness and suppresses artificial play during fatigue or nighttime.
+  - Continuous Langevin Affective Modulation: boredom, mischief, and curiosity continuously modulate target arousal and valence ($A_{\text{target}}, V_{\text{target}}$) without artificial jumps or cutscene scripts.
+  - Neural Matrix Policy Integration: natural Boltzmann Softmax neural action selector (`sampleBrainExpressionPolicy()`) selects playful/curious expressions without forced overrides.
+  - Restlessness-Modulated Lévy Flight Saccades: wide exploratory gaze glances naturally expand when bored and awake, collapsing to calm fixations when drowsy.
+  - Zero heap allocation and zero additional static `.bss` RAM footprint.
+  - Algorithmic host unit test suite `tests/unit/test_sleep_gated_restlessness.cpp` integrated into `scripts/run_tests.sh` (14/14 tests passing).
+  - Architecture Decision Record `docs/adr/ADR-010-autonomous-self-entertainment-and-spontaneous-play-engine.md`.
+
 ## [1.3.0] - 2026-09-10
 
 ### Refactored

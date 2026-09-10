@@ -1,7 +1,7 @@
 # LoRe (*Luminescent Ocular Robotic Engine*)
 
 [![Build Status](https://img.shields.io/badge/Build-Passing-brightgreen.svg)](scripts/build.sh)
-[![Tests](https://img.shields.io/badge/Tests-13%20Passed-brightgreen.svg)](scripts/run_tests.sh)
+[![Tests](https://img.shields.io/badge/Tests-14%20Passed-brightgreen.svg)](scripts/run_tests.sh)
 [![Platform](https://img.shields.io/badge/Hardware-ESP32--S3%20SuperMini-blue.svg)](https://www.espressif.com/)
 [![Display](https://img.shields.io/badge/Display-SSD1306%20OLED%20(128x64)-blueviolet.svg)](https://github.com/lovyan03/LovyanGFX)
 [![Memory](https://img.shields.io/badge/Memory-Internal%20SRAM%20Only-success.svg)](docs/adr/ADR-003-sram-only-memory-budget.md)
@@ -54,6 +54,7 @@
   6. *Hippus & Cardiorespiratory Vitality Pulse*: Continuous $\pm 2.2\%$ breathing pulsation coupled directly to Matsuoka CPG respiratory phase.
 - **Continuous Superellipse (Formula Lamé) Soma Morphology**: Real-time 60 FPS parametric ocular rendering ($|x/a|^n + |y/b|^n \le 1$), enabling LoRe to continuously actuate eye width, height, corner curvature exponent, hollow/solid stroke, asymmetric tilt, and physical OLED hardware contrast.
 - **Twelve-Expression Parametric Palpebral Soma & Dual-Plane Slants**: Complete suite of 12 rich biological and expressive archetypes (`IDLE`, `HAPPY`, `ANGRY`, `SAD`, `SURPRISED`, `SUSPICIOUS`, `CURIOUS`, `MISCHIEF`, `SLEEPY`, `COOL`, `DIZZY`, `CRYING`) animated at 60 FPS via independent upper brow and lower cheek cutting planes ($y_r < -y_{\text{top\_cut}} + x_r \tan\theta_{\text{brow}}$ and $y_r > y_{\text{bottom\_cut}} + x_r \tan\theta_{\text{cheek}}$) with early-exit rasterization and 85 ms critically damped morph target convergence.
+- **First-Principles Sleep-Gated Restlessness & Spontaneous Solitude Play**: Endogenously motivated agency driven purely by homeostatic drives, circadian rhythm, and biological differential equations without external network or notification dependency. When alone and well-rested, boredom and curiosity continuously bias Langevin target arousal and valence ($\Delta A_{\text{target}}, \Delta V_{\text{target}}$) and expand wide exploratory Lévy flight saccades, prompting playful glances and expressions (`EXPR_CURIOUS`, `EXPR_MISCHIEF`, `EXPR_WINK`). Crucially, a quadratic sleep-gating function ($\text{sleep\_gate} = \max(0.0, 1.0 - P_{\text{sleep}})^2$) guarantees that Borbély sleep pressure strictly suppresses restlessness when drowsy, allowing natural palpebral droop and micro-sleep dozes to proceed peacefully without artificial cutscenes or hardcoded timers.
 - **Autonomic Brainstem CPG & Sleep-Struggle Kinetics**: Matsuoka coupled non-linear neural oscillators paired with continuous palpebral droop physics and volitional struggle snaps ("merem setengah" and fighting to stay awake), producing spontaneous biological agency.
 - **Physiological Micro-Nystagmus**: Continuous sub-pixel Langevin Brownian fluctuations coupled to ocular motor output for lifelike organic micro-tremor.
 - **Russell Circumplex Affective Engine**: Stochastic Langevin diffusion across valence-arousal emotional state space coupled with autonomic vitality.
