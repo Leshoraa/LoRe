@@ -1017,6 +1017,37 @@ static const char HTML_PAGE[] PROGMEM = R"rawliteral(<!DOCTYPE html>
             </div>
 
             <button type="button" id="btn-expr-auto" class="btn-expr-auto active">Default (Auto Mood)</button>
+
+            <!-- Micro-Expressions Controller (128 Nuances) -->
+            <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border-subtle);">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                <span style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.04em;">Micro-Expressions (128 Nuances)</span>
+                <span id="tel-micro-active" style="font-size:11px;font-weight:600;color:var(--text-muted);background:var(--bg-subtle);padding:2px 8px;border-radius:10px;">IDLE</span>
+              </div>
+              <div style="display:flex;gap:6px;margin-bottom:8px;">
+                <select id="micro-cat-select" style="flex:1;background:var(--bg-surface);color:var(--text-main);border:1px solid var(--border-card);border-radius:var(--radius-control);padding:6px 8px;font-size:11px;font-weight:600;">
+                  <option value="-1">All Categories</option>
+                  <option value="0">0: Cognitive (16)</option>
+                  <option value="1">1: Affectionate (16)</option>
+                  <option value="2">2: Playful (16)</option>
+                  <option value="3">3: Startle (16)</option>
+                  <option value="4">4: Skepticism (16)</option>
+                  <option value="5">5: Melancholy (16)</option>
+                  <option value="6">6: Irritation (16)</option>
+                  <option value="7">7: Drowsiness (16)</option>
+                </select>
+                <select id="micro-expr-select" style="flex:2;background:var(--bg-surface);color:var(--text-main);border:1px solid var(--border-card);border-radius:var(--radius-control);padding:6px 8px;font-size:11px;font-weight:600;">
+                </select>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px;">
+                <button type="button" id="btn-trigger-micro" style="flex:1;background:var(--accent-dark);color:#fff;border-radius:var(--radius-control);padding:8px 10px;font-size:12px;font-weight:700;cursor:pointer;">Trigger Micro</button>
+                <button type="button" id="btn-stop-micro" style="background:var(--bg-surface);color:var(--text-main);border:1px solid var(--border-card);border-radius:var(--radius-control);padding:8px 10px;font-size:12px;font-weight:600;cursor:pointer;">Stop</button>
+                <div style="display:flex;align-items:center;gap:4px;background:var(--bg-subtle);padding:4px 8px;border-radius:var(--radius-control);">
+                  <span style="font-size:10px;font-weight:600;color:var(--text-muted);">Amp:</span>
+                  <input type="range" id="micro-intensity" min="0.3" max="1.0" step="0.05" value="1.0" style="width:50px;">
+                </div>
+              </div>
+            </div>
           </section>
 
           <!-- Bento Card 3: Cognitive & Neural State -->
@@ -1724,6 +1755,19 @@ static const char HTML_PAGE[] PROGMEM = R"rawliteral(<!DOCTYPE html>
               }
             });
           }
+
+          /* Update active micro-expression indicator */
+          const microActiveBadge = document.getElementById('tel-micro-active');
+          if (microActiveBadge) {
+            if (data.micro_name && data.micro_name !== 'NONE') {
+              const pct = Math.round((data.micro_progress || 0) * 100);
+              microActiveBadge.innerText = `${data.micro_name} (${pct}%)`;
+              microActiveBadge.style.color = 'var(--md-sys-color-tertiary)';
+            } else {
+              microActiveBadge.innerText = 'IDLE';
+              microActiveBadge.style.color = 'var(--text-muted)';
+            }
+          }
         }
       } catch (e) {
         console.error('Telemetry fetch error:', e);
@@ -1768,6 +1812,93 @@ static const char HTML_PAGE[] PROGMEM = R"rawliteral(<!DOCTYPE html>
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ expr: 'auto' })
+        }).catch(() => {});
+      });
+    }
+
+    /* Micro-Expressions (128 Nuances) Controller Logic */
+    const kMicroExprList = [
+      "INQUISITIVE_BROW_L","INQUISITIVE_BROW_R","PERPLEXED_FURROW","DEEP_CONCENTRATION",
+      "PENSIVE_GAZE_DRIFT","SUDDEN_REALIZATION","ANALYTICAL_SCAN","THOUGHTFUL_SQUINT",
+      "FLEETING_HESITATION","FLEETING_CONFUSION","CURIOUS_PEER_UP","ATTENTIVE_PERK",
+      "MILD_DISTRACTION","PONDERING_LEFT","PONDERING_RIGHT","MEMORY_RECALL_DRIFT",
+      "SHY_FOND_PEEK","SUBTLE_AFFECTION_SOFTEN","FLEETING_DUCHENNE_SMILE","WARM_GAZE_LINGER",
+      "BASHFUL_OUTER_DROOP","PLAYFUL_WINK_L","PLAYFUL_WINK_R","SUPPRESSED_GIGGLE",
+      "MODEST_DOWNCAST","GENTLE_GRATITUDE","LOVING_SQUINT","WELCOMING_PERK",
+      "SYMPATHETIC_TILT","SOFT_REASSURANCE","COY_LATERAL_GLANCE","CHEERFUL_SHIMMER",
+      "SLY_SMIRK_L","SLY_SMIRK_R","CHEEKY_BROW_TWITCH","TEASING_ASYM_SQUINT",
+      "SCHEMING_NARROW","PLAYFUL_STARTLE_BOUNCE","FEIGNED_INNOCENCE","CONSPIRATORIAL_WINK",
+      "MOCK_SUSPICION","SASSY_BROW_ARCH","MISCHIEVOUS_SIDE_GLANCE","FROLIC_FLUTTER",
+      "SMUG_HALF_LID_L","SMUG_HALF_LID_R","GLEE_SHIVER","IMPISH_DART",
+      "MICRO_STARTLE_DILATION","FLEETING_SHOCK_RECOIL","INVOLUNTARY_WIDE_PERK","SUDDEN_DOUBLE_TAKE",
+      "HIGH_VIGILANCE_FLARE","ALERT_DART_L","ALERT_DART_R","FLEETING_BEWILDERMENT",
+      "ASTONISHED_BREATH_HOLD","MICRO_GASP_SPURT","FLABBERGASTED_WIDEN","STARTLED_FREEZE",
+      "STUNNED_BLINK_RECOVERY","INCREDULOUS_BROW_COCK","FLEETING_DISBELIEF","ELECTRIC_JOLT_TWITCH",
+      "CRITICAL_BROW_SLANT","SKEPTICAL_SQUINT_L","SKEPTICAL_SQUINT_R","NARROWED_SCRUTINY",
+      "GUARDED_SIDE_EYE","DISAPPROVING_BROW_DROP","FLEETING_DISDAIN","HESITANT_SIDE_STEP",
+      "WARY_GAZE_FREEZE","APPREHENSIVE_OUTER_DROOP","CAUTIOUS_DISTANCE_SACCADE","UNIMPRESSED_FLAT_LID",
+      "QUIZZICAL_EYE_ROLL","QUESTIONING_SQUINT","SUSPICIOUS_SCAN_L","SUSPICIOUS_SCAN_R",
+      "FLEETING_SORROW_DROOP","TENDER_SYMPATHY","ANXIOUS_MICRO_FLUTTER","LONELY_DOWNWARD_AVERT",
+      "HESITANT_UPWARD_GLANCE","SUPPRESSED_WINCE","SUBTLE_MELANCHOLIC_SIGH","FRAGILE_GAZE_CAST",
+      "FORLORN_DISTANT_LOOK","REGRETFUL_LID_LOWER","TIMID_SHYNESS_PEEK","SOFT_HEARTACHE_TREMOR",
+      "APOLOGETIC_BROW_SPLAY","NEEDY_PUPIL_DILATION","FLEETING_MELANCHOLY_TILT","WISTFUL_CONTEMPLATION",
+      "STERN_BROW_FURROW","STUBBORN_SQUINT","IRRITATED_BROW_TWITCH","DEFIANT_NARROWING",
+      "GRUMPY_LOWERED_GAZE","FIERCE_FOCUS_LOCK","IMPATIENT_MICRO_SACCADE","SKEPTICAL_SIDE_GLARE",
+      "RESOLUTE_GAZE_FIXATION","SULLEN_EYE_CAST","ANNOYED_PALPEBRAL_PINCH","TENSE_INNER_BROW_NOTCH",
+      "PUFFED_CHEEK_TENSE","CHALLENGING_BROW_ARCH","STOIC_GAZE_SETTLE","GRITTED_CONCENTRATION",
+      "HEAVY_UPPER_LID_LAG","DROWSY_SLIT_DRIFT","CONTENTED_SLOW_FLUTTER","PEACEFUL_SIGH_SOFTEN",
+      "RELAXED_EYE_FLATTENING","LAZILY_LOWERED_BROW","DAYDREAMING_DISTANT_GAZE","MICRO_YAWN_STRETCH",
+      "SWEET_SLUMBER_SETTLE","COMFORTED_SOFT_SACCADE","SLEEPY_WOBBLE_DRIFT","HYPNAGOGIC_FLUTTER",
+      "EXHAUSTED_HEAVY_GLAZE","WARM_DROWSE_SPLAY","COZY_EYELID_SNUGGLE","RESTING_BLISS_SLIT"
+    ];
+
+    const microCatSelect = document.getElementById('micro-cat-select');
+    const microExprSelect = document.getElementById('micro-expr-select');
+    const btnTriggerMicro = document.getElementById('btn-trigger-micro');
+    const btnStopMicro = document.getElementById('btn-stop-micro');
+    const microIntensity = document.getElementById('micro-intensity');
+
+    function populateMicroSelect(catFilter) {
+      if (!microExprSelect) return;
+      microExprSelect.innerHTML = '';
+      const filter = parseInt(catFilter, 10);
+      kMicroExprList.forEach((name, idx) => {
+        const cat = Math.floor(idx / 16);
+        if (filter === -1 || filter === cat) {
+          const opt = document.createElement('option');
+          opt.value = idx;
+          opt.innerText = `${idx}: ${name.replace(/_/g, ' ')}`;
+          microExprSelect.appendChild(opt);
+        }
+      });
+    }
+
+    if (microCatSelect && microExprSelect) {
+      populateMicroSelect(-1);
+      microCatSelect.addEventListener('change', function() {
+        populateMicroSelect(this.value);
+      });
+    }
+
+    if (btnTriggerMicro) {
+      btnTriggerMicro.addEventListener('click', function() {
+        if (!microExprSelect) return;
+        const id = parseInt(microExprSelect.value, 10);
+        const intensity = microIntensity ? parseFloat(microIntensity.value) : 1.0;
+        fetch('/api/micro_expr', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: id, intensity: intensity })
+        }).catch(() => {});
+      });
+    }
+
+    if (btnStopMicro) {
+      btnStopMicro.addEventListener('click', function() {
+        fetch('/api/micro_expr', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: 'stop' })
         }).catch(() => {});
       });
     }

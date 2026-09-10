@@ -16,6 +16,7 @@
 #include "src/config/device_config.h"
 #include "src/config/lore_config.h"
 #include "src/types/lore_types.h"
+#include "src/core/micro_expression_engine.h"
 #include "src/math/affective_engine.h"
 #include "src/ai/brain_engine.h"
 #include "src/ai/personality_engine.h"
@@ -164,6 +165,56 @@ static esp_err_t set_expression_handler(httpd_req_t *req) {
     }
 
     const char* resp = "{\"status\":\"ok\"}";
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
+    return httpd_resp_send(req, resp, strlen(resp));
+}
+
+static esp_err_t set_micro_expression_handler(httpd_req_t *req) {
+    g_last_web_activity_ms = millis();
+    char buf[128];
+    int remaining = req->content_len;
+    if (remaining >= (int)sizeof(buf)) remaining = sizeof(buf) - 1;
+
+    int ret = httpd_req_recv(req, buf, remaining);
+    if (ret <= 0) {
+        if (ret == HTTPD_SOCK_ERR_TIMEOUT) {
+            httpd_resp_send_408(req);
+        }
+        return ESP_FAIL;
+    }
+    buf[ret] = '\0';
+
+    char micro_val[48] = {0};
+    char intensity_val[16] = {0};
+    float intensity = 1.0f;
+
+    if (extract_json_field(buf, "intensity", intensity_val, sizeof(intensity_val))) {
+        intensity = (float)atof(intensity_val);
+        if (intensity < 0.1f) intensity = 0.1f;
+        if (intensity > 1.0f) intensity = 1.0f;
+    }
+
+    bool success = false;
+    if (extract_json_field(buf, "id", micro_val, sizeof(micro_val)) ||
+        extract_json_field(buf, "micro", micro_val, sizeof(micro_val)) ||
+        extract_json_field(buf, "name", micro_val, sizeof(micro_val))) {
+        if (strcmp(micro_val, "stop") == 0 || strcmp(micro_val, "-1") == 0) {
+            stopMicroExpression();
+            success = true;
+        } else if (isdigit((unsigned char)micro_val[0])) {
+            int id = atoi(micro_val);
+            if (id >= 0 && id < NUM_MICRO_EXPRESSIONS) {
+                success = triggerMicroExpression((MicroExpressionId)id, intensity);
+            }
+        } else {
+            success = triggerMicroExpressionByName(micro_val, intensity);
+        }
+    }
+
+    char resp[96];
+    snprintf(resp, sizeof(resp), "{\"status\":\"%s\",\"active_id\":%d}",
+             success ? "ok" : "error", (int)getActiveMicroExpressionId());
     httpd_resp_set_type(req, "application/json");
     httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
     return httpd_resp_send(req, resp, strlen(resp));
@@ -542,7 +593,7 @@ void startWebServer(void) {
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
     config.server_port = HTTP_PORT_WEB_CONTROL;
     config.ctrl_port = 32768;
-    config.max_uri_handlers = 27;
+    config.max_uri_handlers = 30;
     config.stack_size = 8192;
     config.core_id = 0;
     config.lru_purge_enable = true;
@@ -550,6 +601,7 @@ void startWebServer(void) {
     httpd_uri_t index_uri               = { .uri = "/",                   .method = HTTP_GET,  .handler = index_handler,               .user_ctx = NULL };
     httpd_uri_t telemetry_uri           = { .uri = "/telemetry",           .method = HTTP_GET,  .handler = telemetry_handler,           .user_ctx = NULL };
     httpd_uri_t set_expression_uri      = { .uri = "/set_expression",      .method = HTTP_POST, .handler = set_expression_handler,        .user_ctx = NULL };
+    httpd_uri_t set_micro_expr_uri      = { .uri = "/api/micro_expr",      .method = HTTP_POST, .handler = set_micro_expression_handler,  .user_ctx = NULL };
     httpd_uri_t set_gaze_uri            = { .uri = "/set_gaze",            .method = HTTP_POST, .handler = set_gaze_handler,           .user_ctx = NULL };
     httpd_uri_t get_wifi_uri            = { .uri = "/get_wifi",            .method = HTTP_GET,  .handler = get_wifi_handler,            .user_ctx = NULL };
     httpd_uri_t save_wifi_uri           = { .uri = "/save_wifi",           .method = HTTP_POST, .handler = save_wifi_handler,           .user_ctx = NULL };
@@ -579,6 +631,7 @@ void startWebServer(void) {
         httpd_register_uri_handler(g_web_httpd, &index_uri);
         httpd_register_uri_handler(g_web_httpd, &telemetry_uri);
         httpd_register_uri_handler(g_web_httpd, &set_expression_uri);
+        httpd_register_uri_handler(g_web_httpd, &set_micro_expr_uri);
         httpd_register_uri_handler(g_web_httpd, &set_gaze_uri);
         httpd_register_uri_handler(g_web_httpd, &get_wifi_uri);
         httpd_register_uri_handler(g_web_httpd, &save_wifi_uri);

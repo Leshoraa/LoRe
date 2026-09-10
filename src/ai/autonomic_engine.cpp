@@ -5,6 +5,7 @@
  */
 
 #include "src/ai/autonomic_engine.h"
+#include "src/core/micro_expression_engine.h"
 #include "src/math/kinematics.h"
 #include "src/math/affective_engine.h"
 #include "src/config/lore_config.h"
@@ -194,6 +195,8 @@ void initAutonomicEngine(void) {
     s_current_soma.hardware_contrast = 180;
     s_current_soma.nystagmus_x = 0.0f;
     s_current_soma.nystagmus_y = 0.0f;
+
+    initMicroExpressionEngine();
 }
 
 void updateAutonomicEngine(float dt_sec) {
@@ -375,28 +378,85 @@ void updateAutonomicEngine(float dt_sec) {
     int raw_contrast = 40 + (int)(175.0f * s_metabolic_energy + 25.0f * y1);
     uint8_t hw_contrast = (uint8_t)clamp_f((float)raw_contrast, 30.0f, 255.0f);
 
+    /* Continuous 60 FPS Micro-Expression Kinematics Integration */
+    updateMicroExpressionEngine(dt_sec);
+    MicroExpressionDelta micro_delta = getActiveMicroExpressionDelta();
+
+    float final_left_w = left_w;
+    float final_right_w = right_w;
+    float final_left_h = left_h;
+    float final_right_h = right_h;
+    float final_left_n = left_n;
+    float final_right_n = right_n;
+    float final_brow_l = s_morph_brow_l;
+    float final_brow_r = s_morph_brow_r;
+    float final_cheek_l = s_morph_cheek_l;
+    float final_cheek_r = s_morph_cheek_r;
+    float final_upper_l = s_morph_upper_lid_l;
+    float final_upper_r = s_morph_upper_lid_r;
+    float final_lower_l = s_morph_lower_lid_l;
+    float final_lower_r = s_morph_lower_lid_r;
+    float micro_gaze_x = 0.0f;
+    float micro_gaze_y = 0.0f;
+
+    if (micro_delta.active) {
+        final_left_w += micro_delta.delta_w_l;
+        final_right_w += micro_delta.delta_w_r;
+        final_left_h += micro_delta.delta_h_l;
+        final_right_h += micro_delta.delta_h_r;
+        final_left_n += micro_delta.delta_n_l;
+        final_right_n += micro_delta.delta_n_r;
+        final_brow_l += micro_delta.delta_brow_l;
+        final_brow_r += micro_delta.delta_brow_r;
+        final_cheek_l += micro_delta.delta_cheek_l;
+        final_cheek_r += micro_delta.delta_cheek_r;
+        final_upper_l += micro_delta.delta_upper_l;
+        final_upper_r += micro_delta.delta_upper_r;
+        final_lower_l += micro_delta.delta_lower_l;
+        final_lower_r += micro_delta.delta_lower_r;
+        micro_gaze_x = micro_delta.delta_gaze_x;
+        micro_gaze_y = micro_delta.delta_gaze_y;
+    }
+
+    /* Enforce Invariant Anatomical Safety Envelopes:
+     * Guarantees geometry strictly maintains LoRe's friendly squircle aesthetic without uncanny distortions */
+    final_left_w = clamp_f(final_left_w, 24.0f, 38.0f);
+    final_right_w = clamp_f(final_right_w, 24.0f, 38.0f);
+    final_left_h = clamp_f(final_left_h, 16.0f, 34.0f);
+    final_right_h = clamp_f(final_right_h, 16.0f, 34.0f);
+    final_left_n = clamp_f(final_left_n, 2.0f, 4.6f);
+    final_right_n = clamp_f(final_right_n, 2.0f, 4.6f);
+    final_brow_l = clamp_f(final_brow_l, -0.40f, 0.40f);
+    final_brow_r = clamp_f(final_brow_r, -0.40f, 0.40f);
+    final_cheek_l = clamp_f(final_cheek_l, -0.30f, 0.30f);
+    final_cheek_r = clamp_f(final_cheek_r, -0.30f, 0.30f);
+    final_upper_l = clamp_f(final_upper_l, 0.0f, 0.65f);
+    final_upper_r = clamp_f(final_upper_r, 0.0f, 0.65f);
+    final_lower_l = clamp_f(final_lower_l, 0.0f, 0.60f);
+    final_lower_r = clamp_f(final_lower_r, 0.0f, 0.60f);
+
     /* Store updated soma state */
-    s_current_soma.left_x = SOMA_CANONICAL_LEFT_X + dizzy_offset_x_l;
-    s_current_soma.left_y = SOMA_CANONICAL_CENTER_Y + dizzy_offset_y_l;
-    s_current_soma.right_x = SOMA_CANONICAL_RIGHT_X + dizzy_offset_x_r;
-    s_current_soma.right_y = SOMA_CANONICAL_CENTER_Y + dizzy_offset_y_r;
-    s_current_soma.left_w = left_w;
-    s_current_soma.right_w = right_w;
-    s_current_soma.left_h = left_h;
-    s_current_soma.right_h = right_h;
-    s_current_soma.left_n = left_n;
-    s_current_soma.right_n = right_n;
+    s_current_soma.left_x = SOMA_CANONICAL_LEFT_X + dizzy_offset_x_l + micro_gaze_x;
+    s_current_soma.left_y = SOMA_CANONICAL_CENTER_Y + dizzy_offset_y_l + micro_gaze_y;
+    s_current_soma.right_x = SOMA_CANONICAL_RIGHT_X + dizzy_offset_x_r + micro_gaze_x;
+    s_current_soma.right_y = SOMA_CANONICAL_CENTER_Y + dizzy_offset_y_r + micro_gaze_y;
+    s_current_soma.left_w = final_left_w;
+    s_current_soma.right_w = final_right_w;
+    s_current_soma.left_h = final_left_h;
+    s_current_soma.right_h = final_right_h;
+    s_current_soma.left_n = final_left_n;
+    s_current_soma.right_n = final_right_n;
     s_current_soma.stroke_thickness = stroke;
     s_current_soma.tilt_left = tilt_l;
     s_current_soma.tilt_right = tilt_r;
-    s_current_soma.brow_tilt_left = s_morph_brow_l;
-    s_current_soma.brow_tilt_right = s_morph_brow_r;
-    s_current_soma.cheek_tilt_left = s_morph_cheek_l;
-    s_current_soma.cheek_tilt_right = s_morph_cheek_r;
-    s_current_soma.upper_lid_left = s_morph_upper_lid_l;
-    s_current_soma.upper_lid_right = s_morph_upper_lid_r;
-    s_current_soma.lower_lid_left = s_morph_lower_lid_l;
-    s_current_soma.lower_lid_right = s_morph_lower_lid_r;
+    s_current_soma.brow_tilt_left = final_brow_l;
+    s_current_soma.brow_tilt_right = final_brow_r;
+    s_current_soma.cheek_tilt_left = final_cheek_l;
+    s_current_soma.cheek_tilt_right = final_cheek_r;
+    s_current_soma.upper_lid_left = final_upper_l;
+    s_current_soma.upper_lid_right = final_upper_r;
+    s_current_soma.lower_lid_left = final_lower_l;
+    s_current_soma.lower_lid_right = final_lower_r;
     s_current_soma.hardware_contrast = hw_contrast;
     s_current_soma.nystagmus_x = s_nystagmus_x;
     s_current_soma.nystagmus_y = s_nystagmus_y;

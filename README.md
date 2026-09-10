@@ -1,7 +1,7 @@
 # LoRe (*Luminescent Ocular Robotic Engine*)
 
 [![Build Status](https://img.shields.io/badge/Build-Passing-brightgreen.svg)](scripts/build.sh)
-[![Tests](https://img.shields.io/badge/Tests-14%20Passed-brightgreen.svg)](scripts/run_tests.sh)
+[![Tests](https://img.shields.io/badge/Tests-15%20Passed-brightgreen.svg)](scripts/run_tests.sh)
 [![Platform](https://img.shields.io/badge/Hardware-ESP32--S3%20SuperMini-blue.svg)](https://www.espressif.com/)
 [![Display](https://img.shields.io/badge/Display-SSD1306%20OLED%20(128x64)-blueviolet.svg)](https://github.com/lovyan03/LovyanGFX)
 [![Memory](https://img.shields.io/badge/Memory-Internal%20SRAM%20Only-success.svg)](docs/adr/ADR-003-sram-only-memory-budget.md)
@@ -54,6 +54,7 @@
   6. *Hippus & Cardiorespiratory Vitality Pulse*: Continuous $\pm 2.2\%$ breathing pulsation coupled directly to Matsuoka CPG respiratory phase.
 - **Continuous Superellipse (Formula Lamé) Soma Morphology**: Real-time 60 FPS parametric ocular rendering ($|x/a|^n + |y/b|^n \le 1$), enabling LoRe to continuously actuate eye width, height, corner curvature exponent, hollow/solid stroke, asymmetric tilt, and physical OLED hardware contrast.
 - **Twelve-Expression Parametric Palpebral Soma & Dual-Plane Slants**: Complete suite of 12 rich biological and expressive archetypes (`IDLE`, `HAPPY`, `ANGRY`, `SAD`, `SURPRISED`, `SUSPICIOUS`, `CURIOUS`, `MISCHIEF`, `SLEEPY`, `COOL`, `DIZZY`, `CRYING`) animated at 60 FPS via independent upper brow and lower cheek cutting planes ($y_r < -y_{\text{top\_cut}} + x_r \tan\theta_{\text{brow}}$ and $y_r > y_{\text{bottom\_cut}} + x_r \tan\theta_{\text{cheek}}$) with early-exit rasterization and 85 ms critically damped morph target convergence.
+- **128 Biomechanical Micro-Expressions & Viscoelastic Relaxation**: A rich taxonomy of 128 procedural micro-expressions (16 nuances across 8 affective categories: Cognitive, Affectionate, Playful, Startle, Skepticism, Melancholy, Irritation, Drowsiness). Biomechanically animated via 5th-order minimum-jerk rise ($10\tau^3 - 15\tau^4 + 6\tau^5$), respiratory/tremor apex dwell, 2nd-order fractional viscoelastic mass-spring relaxation ($\omega_n = 18.0\text{ rad/s}, \zeta = 0.85$), and volume-conserving biological tissue incompressibility ($S_x = 1/\sqrt{S_y}$). Stored in Flash `.rodata` (~2.5 KB) with zero heap allocation and protected by strict anatomical safety clamps preventing uncanny deformations.
 - **First-Principles Sleep-Gated Restlessness & Spontaneous Solitude Play**: Endogenously motivated agency driven purely by homeostatic drives, circadian rhythm, and biological differential equations without external network or notification dependency. When alone and well-rested, boredom and curiosity continuously bias Langevin target arousal and valence ($\Delta A_{\text{target}}, \Delta V_{\text{target}}$) and expand wide exploratory Lévy flight saccades, prompting playful glances and expressions (`EXPR_CURIOUS`, `EXPR_MISCHIEF`, `EXPR_WINK`). Crucially, a quadratic sleep-gating function ($\text{sleep\_gate} = \max(0.0, 1.0 - P_{\text{sleep}})^2$) guarantees that Borbély sleep pressure strictly suppresses restlessness when drowsy, allowing natural palpebral droop and micro-sleep dozes to proceed peacefully without artificial cutscenes or hardcoded timers.
 - **Autonomic Brainstem CPG & Sleep-Struggle Kinetics**: Matsuoka coupled non-linear neural oscillators paired with continuous palpebral droop physics and volitional struggle snaps ("merem setengah" and fighting to stay awake), producing spontaneous biological agency.
 - **Physiological Micro-Nystagmus**: Continuous sub-pixel Langevin Brownian fluctuations coupled to ocular motor output for lifelike organic micro-tremor.
@@ -127,6 +128,7 @@
 | **AI** | `src/ai/markov_corpus.h` | Markov chain thought generator |
 | **Core** | `src/core/display_engine.h` | LovyanGFX I2C bus timing, `oledTask` loop, auto-brightness |
 | **Core** | `src/core/facial_renderer.h`| 2D facial rig geometry (eyes, mouth, blush) and easing curves |
+| **Core** | `src/core/micro_expression_engine.h`| 128-micro-expression taxonomy, 5th-order activation & viscoelastic relaxation |
 | **Core** | `src/core/ambient_screens.h`| Clock, Weather, Notification, and Navigation screen drawing |
 | **Core** | `src/core/gaze_engine.h` | Virtual gaze coordination, stimulus decay & DFS power scaling |
 | **Net** | `src/net/wifi_manager.h` | Wi-Fi STA, SoftAP fallback, mDNS, DNS captive portal |
@@ -225,6 +227,7 @@ Device configuration can be modified in `src/config/lore_config.h` or dynamicall
 | `/` | `GET` | HTML | Bento Grid Control Dashboard |
 | `/telemetry` | `GET` | JSON | Full telemetry snapshot (gaze, affect, drives, memory) |
 | `/set_expression` | `POST` | `{"expr": 0..11}` | Override facial expression or `-1` for auto |
+| `/api/micro_expr` | `POST` | `{"id": 0..127}` or `{"name":"..."}` | Trigger procedural micro-expression with optional intensity |
 | `/set_gaze` | `POST` | `{"x": -1..1, "y": -1..1}` | Direct gaze to normalized coordinate |
 | `/set_brightness` | `POST` | `{"brightness": 0..255}` | Adjust SSD1306 contrast brightness |
 | `/set_auto_brightness`| `POST` | `{"enabled": true}` | Toggle dynamic ambient auto-brightness |
@@ -263,6 +266,11 @@ bash scripts/run_tests.sh
 - `test_blink_kinematics`: Asserts tri-phase human blink trajectory, asymmetric palpebral closure, and velocity bounds.
 - `test_ble_telemetry`: Verifies JSON telemetry buffer formatting and schema compliance.
 - `test_notification_parser`: Validates JSON string extraction, message wrapping, and app identification.
+- `test_autonomic_cpg`: Asserts Matsuoka non-linear neural oscillator limit cycle and CPG synchronization.
+- `test_superellipse_geometry`: Validates continuous Lamé curve equation rasterization and edge gradients.
+- `test_affective_kinematics`: Tests emotional saccade parameter modulation across expressions.
+- `test_sleep_gated_restlessness`: Asserts quadratic sleep gating suppression of solitude play during drowsiness.
+- `test_micro_expressions`: Validates 128-expression taxonomy, 5th-order minimum-jerk trajectory, viscoelastic spring relaxation, tissue volume conservation, and safety clamping.
 
 ---
 

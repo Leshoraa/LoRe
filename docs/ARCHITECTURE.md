@@ -21,6 +21,7 @@ LoRe/
 │   ├── lore_affective.h       # Affective engine forwarding header
 │   ├── lore_ai.h              # Brain engine forwarding header
 │   ├── lore_autonomic.h       # Autonomic engine forwarding header
+│   ├── lore_micro_expressions.h # Micro-expressions forwarding header
 │   └── lore_personality.h     # Personality engine forwarding header
 ├── src/
 │   ├── config/                # Configuration and persistent storage layer
@@ -42,6 +43,7 @@ LoRe/
 │   ├── core/                  # Display orchestration and ocular rendering
 │   │   ├── display_engine.h/cpp # LovyanGFX I2C bus setup, oledTask loop, auto-brightness & burn-in shift
 │   │   ├── facial_renderer.h/cpp# Continuous Superellipse soma morphology, vergence & easing
+│   │   ├── micro_expression_engine.h/cpp # 128 continuous FACS biological micro-expressions & spring dynamics
 │   │   ├── ambient_screens.h/cpp# Clock, Open-Meteo Weather, Mobile Notification & Navigation HUD
 │   │   └── gaze_engine.h/cpp  # Autonomous gaze coordination, stimulus decay & DFS power scaling
 │   └── net/                   # Communication, protocols, and APIs
@@ -53,13 +55,14 @@ LoRe/
 │       ├── weather_client.h/cpp # Background Open-Meteo REST forecast fetcher
 │       ├── notification_client.h/cpp # Background Ntfy.sh NDJSON stream listener
 │       └── net_utils.h/cpp    # Shared JSON key-value extraction and notification classification
-├── tests/                     # Host unit test suite (12 tests, zero Arduino dependencies)
+├── tests/                     # Host unit test suite (15 algorithmic suites, zero Arduino dependencies)
 ├── scripts/                   # Build and test orchestration scripts
 │   ├── build.sh               # arduino-cli compile wrapper for ESP32-S3
-│   └── run_tests.sh           # C++20 host test runner (g++ -O3 -std=c++20)
+│   └── run_tests.sh           # C++17 host test runner (g++ -O2 -std=c++17)
 └── docs/                      # Technical specifications and architecture records
     ├── ARCHITECTURE.md        # System architecture and memory partitioning
-    └── adr/                   # Architecture Decision Records (ADR-001 through ADR-005)
+    ├── MATHEMATICAL_MODELS.md # Biomechanical & kinematic mathematical formulations
+    └── adr/                   # Architecture Decision Records (ADR-001 through ADR-011)
 ```
 
 ---
@@ -88,13 +91,14 @@ LoRe/
 +---------------------------------------------------------------------------------+
 | CORE 1: oledTask (Priority 1, 60 FPS Kinematics & Rendering Loop)               |
 | - 2D Russell Circumplex Affective Engine (Valence-Arousal Langevin Diffusion)   |
-| - On-Device TinyML Micro-Brain (Homeostatic Drives & Markov Action Selection)   |
-| - Unified Rigid 2D Facial Rig (2 Expressions: IDLE, HAPPY)                      |
+| - On-Device TinyML Micro-Brain (12x8 Neural Policy Matrix & Episodic Memory)    |
+| - 12-Archetype Parametric Soma with Dual-Plane Palpebral Slant Cuts             |
+| - 128 Continuous FACS Biomechanical Micro-Expressions & Spring Dynamics        |
 | - Coordinate Hysteresis Filtering (getFilteredOx, getFilteredOy)                |
 | - Ocular Dynamics (32.0 rad/s Underdamped Mass-Spring-Damper, zeta = 0.72)      |
 | - 5th-Order Minimum-Jerk Saccades (Flash & Hogan Formulation)                   |
 | - Fixation Micro-Kinetics (Mean-Reverting Brownian Random Walk)                 |
-| - Non-Blocking Eyelid State Machine (Idle -> Closing -> Closed Dwell -> Opening -> Blink-Chain / Drowsy Doze) |
+| - Non-Blocking Eyelid State Machine (Idle -> Closing -> Closed Dwell -> Opening)|
 | - OLED Anti-Burn-In Protection (+/-1 px Micro-Shift during Standby)             |
 | - Ambient Screens (Clock, Open-Meteo Weather, Push Notification, Turn-by-Turn)   |
 | - LovyanGFX 1-Bit Monochrome Sprite Renderer (1.0 MHz Fast-Mode Plus I2C Bus)   |

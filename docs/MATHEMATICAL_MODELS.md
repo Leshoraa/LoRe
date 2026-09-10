@@ -341,3 +341,45 @@ For `EXPR_DIZZY`, ocular geometry is governed by first-principles vestibulo-ocul
 
 5. **Palpebral Blush Accents:**
    Smooth filled anime blush ovals ($r_x = 5\text{ px}, r_y = 2\text{ px}$) render below each eye at $y_{\text{blush}} = y_c + b + 3.5\text{ px}$ during open aperture ($aperture > 0.40$).
+
+---
+
+## 13. Continuous Biomechanical Micro-Expression Dynamics & FACS Action Unit Modeling
+
+To provide 128 nuanced affective and cognitive micro-expressions without storing static bitmaps or introducing jarring frame transitions, LoRe integrates a continuous Action Unit (AU) somatic perturbation engine.
+
+### 13.1 Tri-Phase Physical Kinematic Envelope
+Each micro-expression executes through three continuous mechanical phases over a dynamic duration $T_{\text{total}} = t_{\text{onset}} + t_{\text{dwell}} + t_{\text{decay}}$:
+
+1. **Phase 1: 5th-Order Minimum-Jerk Motor Recruitment ($t \in [0, t_{\text{onset}}]$):**
+   $$s(\tau) = 10\tau^3 - 15\tau^4 + 6\tau^5, \quad \tau = \frac{t}{t_{\text{onset}}}$$
+   satisfying $s(0) = 0$, $s(1) = 1$, and $\dot{s}(0) = \dot{s}(1) = \ddot{s}(0) = \ddot{s}(1) = 0$ ($C^2$ jerk-free continuity).
+
+2. **Phase 2: Myogenic Apex Dwell & Respiratory Tremor ($t \in [t_{\text{onset}}, t_{\text{onset}} + t_{\text{dwell}}]$):**
+   $$\mathcal{E}(t) = 1.0 + A_{\text{tremor}} \sin(2\pi f_{\text{tremor}} (t - t_{\text{onset}}))$$
+   where $f_{\text{tremor}} = 3.5\text{ Hz}$ and $A_{\text{tremor}} = 0.025$, emulating physiological muscular micro-tremor.
+
+3. **Phase 3: Fractional Viscoelastic Spring-Damper Relaxation ($t > t_{\text{onset}} + t_{\text{dwell}}$):**
+   $$\ddot{x} + 2\zeta\omega_n \dot{x} + \omega_n^2 x = 0$$
+   with underdamped parameters $\omega_n = 18.0\text{ rad/s}$ and $\zeta = 0.85$:
+   $$\omega_d = \omega_n \sqrt{1 - \zeta^2} \approx 9.48\text{ rad/s}$$
+   $$\mathcal{E}(t) = e^{-\zeta \omega_n t_{\text{decay}}} \left[ \cos(\omega_d t_{\text{decay}}) + \frac{\zeta}{\sqrt{1 - \zeta^2}} \sin(\omega_d t_{\text{decay}}) \right]$$
+   settling asymptotically to zero without residual tension.
+
+### 13.2 Biological Tissue Incompressibility Law
+Volume conservation under dynamic micro-expression deformation:
+$$S_y = 1.0 + \frac{\Delta h}{H_{\text{canonical}}}$$
+$$S_x = \frac{1.0}{\sqrt{S_y}}$$
+$$\Delta w_{\text{conserved}} = \Delta w_{\text{def}} + \frac{1}{2} W_{\text{canonical}} \cdot (S_x - 1.0)$$
+
+### 13.3 Invariant Anatomical Safety Clamps
+Every active perturbation vector $[\Delta w, \Delta h, \Delta n, \Delta\theta_{\text{brow}}, \Delta\theta_{\text{cheek}}, \Delta u_{\text{lid}}, \Delta l_{\text{lid}}, \Delta x, \Delta y]$ is added to the active soma state and clamped to invariant physiological ranges:
+- $W \in [24.0, 38.0]\text{ px}$
+- $H \in [16.0, 34.0]\text{ px}$
+- $n \in [2.0, 4.6]$
+- $\theta_{\text{brow}} \in [-0.40, +0.40]\text{ rad}$ ($\approx \pm 23^\circ$)
+- $\theta_{\text{cheek}} \in [-0.30, +0.30]\text{ rad}$
+- $u_{\text{lid}} \in [0.0, 0.65]$
+- $l_{\text{lid}} \in [0.0, 0.60]$
+- $\Delta x, \Delta y \in [-4.0, +4.0]\text{ px}$
+

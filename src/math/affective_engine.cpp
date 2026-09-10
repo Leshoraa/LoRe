@@ -4,6 +4,7 @@
  */
 
 #include "src/math/affective_engine.h"
+#include "src/core/micro_expression_engine.h"
 #include "src/ai/brain_engine.h"
 #include "src/ai/personality_engine.h"
 #include "src/config/lore_config.h"
@@ -77,6 +78,7 @@ const char* getExpressionName(Expression expr) {
 
 void setNextExpression(Expression newExpr) {
     if (g_currentExpr != newExpr && !g_is_transitioning) {
+        stopMicroExpression();
         g_is_transitioning = true;
         transitionExpression(g_currentExpr, newExpr, 170.0f);
         g_animFrame = 0.0f;
@@ -208,6 +210,13 @@ void updateBiologicalMoodEngine(void) {
 
     /* Advance TinyML Micro-Brain Homeostatic Drives & Neural Policy Inference */
     updateBrainEngine(dt);
+
+    /* Evaluate Autonomous Spontaneous Micro-Expressions */
+    BrainTelemetry brain_tel = getBrainTelemetry();
+    updateAutonomousMicroExpressions(dt, s_emotion_valence, s_emotion_arousal,
+                                     brain_tel.drives.curiosity, brain_tel.drives.mischief,
+                                     brain_tel.drives.social, brain_tel.drives.boredom,
+                                     brain_tel.drives.fatigue, is_detected);
 
     /* Event-Driven Biological State Transitions */
     if (is_detected && !s_lastTargetDetectedState) {

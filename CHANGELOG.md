@@ -2,6 +2,23 @@
 
 All notable changes to the LoRe firmware project will be documented in this file.
 
+## [1.5.0] - 2026-09-10
+
+### Added
+- 128 Biomechanical Micro-Expressions & Nonlinear Viscoelastic Dynamics (`src/core/micro_expression_engine.h`, `micro_expression_engine.cpp`):
+  - Comprehensive biological taxonomy of 128 procedural micro-expressions organized into 8 affective categories (Cognitive, Affectionate, Playful, Startle, Skepticism, Melancholy, Irritation, Drowsiness), with 16 distinct nuances each.
+  - Zero Dynamic Heap Allocation (ADR-003 compliance): all 128 archetype definitions stored in Flash `.rodata` (~2.5 KB), with runtime engine consuming < 64 bytes of internal SRAM.
+  - 5th-Order Minimum-Jerk Activation ($10\tau^3 - 15\tau^4 + 6\tau^5$) providing smooth, continuous acceleration with zero velocity/acceleration impulses at boundaries.
+  - Apex Dwell Kinetics with subtle respiratory hippus and stochastic micro-tremor modulation.
+  - Viscoelastic Relaxation ODE: underdamped second-order mass-spring-damper ($\omega_n = 18.0\text{ rad/s}, \zeta = 0.85$) simulating biological tissue hysteresis, skin elasticity, and soft glissadic decay back to canonical macro-state.
+  - Volume-Conserving Biological Tissue Incompressibility ($S_x = 1/\sqrt{S_y}$ or $S_y = 1/\sqrt{S_x}$) preserving ocular organ volume under deformation.
+  - Strict Anatomical Safety Clamps: limits perturbations so expressions never distort the squircle beyond natural bounds ($W \in [24, 38]$, $H \in [16, 34]$, $n \in [2.0, 4.6]$, brow tilt $\le \pm 23^\circ$, cheek squint $\le 0.30$, upper lid $\le 0.65$, lower lid $\le 0.60$), preventing uncanny valley deformations.
+  - Spontaneous Autonomous Triggering: Poisson/Langevin arrival driven by affective valence, arousal, and homeostatic curiosity/boredom drives.
+  - Web UI & REST API Integration: `POST /api/micro_expr` endpoint and responsive Web Dashboard control panel with category filtering, 128-item dropdown, trigger/stop buttons, and live intensity slider.
+  - Telemetry Serialization: real-time JSON snapshot updated with active `micro_id`, `micro_name`, and `micro_progress`.
+  - Algorithmic Host Unit Test Suite: `tests/unit/test_micro_expressions.cpp` integrated into `scripts/run_tests.sh` (15/15 tests passing).
+  - Documentation: Architecture Decision Record `docs/adr/ADR-011-one-hundred-twenty-eight-biomechanical-micro-expressions.md` and Section 13 in `docs/MATHEMATICAL_MODELS.md`.
+
 ## [1.4.0] - 2026-09-10
 
 ### Added
